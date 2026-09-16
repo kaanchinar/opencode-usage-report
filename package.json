@@ -1,0 +1,38 @@
+{
+  "name": "opencode-usage-report",
+  "version": "0.1.0",
+  "description": "opencode plugin: /usage command showing subscription quota windows for configured providers",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tui": "./src/tui.tsx"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "smoke": "tsx scripts/live-smoke.ts"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*",
+    "@opentui/core": ">=0.5.11",
+    "@opentui/solid": ">=0.5.11",
+    "solid-js": ">=1.9.0"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.0.0",
+    "@opentui/core": "^0.5.11",
+    "@opentui/keymap": "^0.5.11",
+    "@opentui/solid": "^0.5.11",
+    "@types/node": "^22.0.0",
+    "solid-js": "^1.9.15",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  },
+  "license": "MIT"
+}
