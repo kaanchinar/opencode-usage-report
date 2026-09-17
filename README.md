@@ -1,11 +1,27 @@
 # opencode-usage-report
 
+[![npm version](https://img.shields.io/npm/v/opencode-usage-report)](https://www.npmjs.com/package/opencode-usage-report)
+[![CI](https://github.com/kaanchinar/opencode-usage-report/actions/workflows/ci.yml/badge.svg)](https://github.com/kaanchinar/opencode-usage-report/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/npm/l/opencode-usage-report)](./LICENSE)
+
 An [opencode](https://opencode.ai) plugin that adds a `/usage` command (and a
 `usage_report` tool) showing the quota windows (5-hour, weekly, monthly) of your
 inference subscriptions — currently **Kimi Code** (`kimi-for-coding`) and
 **OpenCode Go** (`opencode-go`). It fetches from each provider's API, caches
 results on disk, and can fall back to a local estimate when the API is
 unreachable. It also emits background low-quota warnings in the TUI.
+
+## Features
+
+- `/usage` command and `usage_report` tool for on-demand quota reports, with
+  JSON and single-provider filtering.
+- TUI sidebar panel with live progress bars, `NN%` usage, and reset countdowns
+  for each quota window.
+- On-disk caching with a configurable TTL, plus `--refresh` to bypass it.
+- Local fallback estimate when the provider API is unreachable and no cache
+  exists.
+- Background low-quota TUI warnings on startup and `session.idle`.
+- Privacy-first: API keys are never logged, cached, or rendered.
 
 ## Install
 
@@ -122,3 +138,7 @@ npm test                          # vitest, no network
 npm run typecheck                 # tsc --noEmit
 npm run smoke -- --yes-live       # manual live check (real keys; opt-in)
 ```
+
+## License
+
+MIT © [Kaan Chinar](https://github.com/kaanchinar)

@@ -2,6 +2,7 @@
   "name": "opencode-usage-report",
   "version": "0.1.0",
   "description": "opencode plugin: /usage command showing subscription quota windows for configured providers",
+  "author": "Kaan Chinar",
   "type": "module",
   "main": "src/index.ts",
   "exports": {
@@ -12,10 +13,28 @@
     "src",
     "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kaanchinar/opencode-usage-report.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kaanchinar/opencode-usage-report/issues"
+  },
+  "homepage": "https://github.com/kaanchinar/opencode-usage-report#readme",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "usage",
+    "quota",
+    "rate-limit",
+    "kimi",
+    "tui"
+  ],
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "smoke": "tsx scripts/live-smoke.ts"
+    "smoke": "tsx scripts/live-smoke.ts",
+    "prepublishOnly": "npm run typecheck && npm test"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": "*",
@@ -34,5 +53,8 @@
     "typescript": "^5.6.0",
     "vitest": "^3.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
 }
