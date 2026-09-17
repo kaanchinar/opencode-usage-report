@@ -31,7 +31,7 @@ Add the plugin to `opencode.json` / `opencode.jsonc` and restart opencode:
 
 ```jsonc
 {
-  "plugin": ["./path/to/opencode-usage-report"] // or an npm spec
+  "plugin": ["opencode-usage-report"]
 }
 ```
 
@@ -41,18 +41,31 @@ options in the tuple form:
 
 ```jsonc
 {
-  "plugin": [["./path/to/opencode-usage-report", { "thresholdPercent": 75 }]]
+  "plugin": [["opencode-usage-report", { "thresholdPercent": 75 }]]
 }
 ```
 
 ### TUI sidebar panel
 
-Add the TUI module to `tui.json` and restart opencode:
+Add the plugin to `tui.json` and restart opencode:
 
 ```jsonc
 {
-  "plugin": ["file:///abs/path/to/opencode-usage-report/src/tui.tsx"]
+  "plugin": ["opencode-usage-report"]
 }
+```
+
+Use the bare package name — opencode resolves the `./tui` entrypoint from the
+package `exports` on its own. (`opencode-usage-report/tui` is **not** a valid
+spec and will silently not load.)
+
+For local development, point the configs at the source instead:
+
+```jsonc
+// opencode.json
+{ "plugin": ["file:///abs/path/to/opencode-usage-report/src/index.ts"] }
+// tui.json
+{ "plugin": ["file:///abs/path/to/opencode-usage-report/src/tui.tsx"] }
 ```
 
 The panel renders under opencode's native Context block in the session sidebar
