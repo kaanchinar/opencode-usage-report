@@ -1,10 +1,14 @@
 name: Publish
 
-# Publishes to npm when a v* tag is pushed, or manually via workflow_dispatch.
-# Uses npm Trusted Publishing (OIDC): no NPM_TOKEN secret is needed after the
-# publisher is configured once at
+# Stages a release on npm when a v* tag is pushed, or manually via
+# workflow_dispatch. Uses npm Trusted Publishing (OIDC): no NPM_TOKEN secret is
+# needed after the publisher is configured once at
 # https://www.npmjs.com/package/opencode-usage-report/access
 # (GitHub Actions: owner kaanchinar, repo opencode-usage-report, workflow publish.yml).
+#
+# Publishing is STAGED: CI uploads the tarball, and a maintainer must approve it
+# with 2FA before it goes live. Approve with `npm stage list` + `npm stage approve
+# <stage-id>` (or the npmjs.com UI). See docs: https://docs.npmjs.com/staged-publishing
 on:
   push:
     tags: ["v*"]
@@ -29,4 +33,4 @@ jobs:
         run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
       - run: npm ci
       # prepublishOnly runs typecheck + tests before the upload.
-      - run: npm publish --provenance --access public
+      - run: npm stage publish --provenance --access public
