@@ -11,7 +11,7 @@ const h = vi.hoisted(() => {
   const fetchMock = vi.fn();
   const localEstimateMock = vi.fn();
   const adapters = [
-    { id: "kimi-for-coding", displayName: "Kimi Code", fetch: fetchMock },
+    { id: "kimi-code-plan-global", displayName: "Kimi Code (kimi.ai)", fetch: fetchMock },
     { id: "opencode-go", displayName: "OpenCode Go", fetch: fetchMock },
   ];
   return { fetchMock, localEstimateMock, adapters };
@@ -32,7 +32,7 @@ import type { AdapterResult, ProviderReport } from "../src/types.js";
 const dataEnv = (dir: string): NodeJS.ProcessEnv =>
   ({
     OPENCODE_DATA_HOME: dir,
-    OPENCODE_USAGE_KIMI_FOR_CODING_KEY: KEY,
+    OPENCODE_USAGE_KIMI_CODE_PLAN_GLOBAL_KEY: KEY,
     OPENCODE_USAGE_OPENCODE_GO_KEY: KEY,
   }) as unknown as NodeJS.ProcessEnv;
 
@@ -76,7 +76,7 @@ describe("security: no key material anywhere (spec §7.7)", () => {
     h.fetchMock.mockRejectedValue(new AdapterError("auth", `upstream echoed ${KEY}`));
     h.localEstimateMock.mockResolvedValue(null);
     const errored = await collectReports({
-      providers: ["kimi-for-coding"],
+      providers: ["kimi-code-plan-global"],
       options: { fallback: false },
       env,
     });

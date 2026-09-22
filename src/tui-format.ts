@@ -109,10 +109,10 @@ export function percentText(w: {
   const usedIsNumber = typeof used === "number" && Number.isFinite(used);
   const limitIsNumber = typeof limit === "number" && Number.isFinite(limit);
   if (usedIsNumber && limitIsNumber) {
-    return `${used.toLocaleString()}/${limit.toLocaleString()}`;
+    return `${used.toLocaleString("en-US")}/${limit.toLocaleString("en-US")}`;
   }
   if (usedIsNumber) {
-    return `~${used.toLocaleString()}`;
+    return `~${used.toLocaleString("en-US")}`;
   }
   return "—";
 }

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Credential } from "./types.js";
 import { dataHome } from "./paths.js";
 
-/** "kimi-for-coding" -> "OPENCODE_USAGE_KIMI_FOR_CODING_KEY" (non-alphanumerics become "_", uppercased). */
+/** "kimi-code-plan-global" -> "OPENCODE_USAGE_KIMI_CODE_PLAN_GLOBAL_KEY" (non-alphanumerics become "_", uppercased). */
 export function envVarName(providerId: string): string {
   const normalized = providerId.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase();
   return `OPENCODE_USAGE_${normalized}_KEY`;

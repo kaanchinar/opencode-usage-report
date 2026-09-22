@@ -3,7 +3,7 @@ import { renderText, renderJson } from "../src/render.js";
 import type { ProviderReport } from "../src/types.js";
 
 const base: ProviderReport = {
-  provider: "kimi-for-coding", displayName: "Kimi Code", fetchedAt: new Date(Date.now() - 5 * 60000).toISOString(),
+  provider: "kimi-code-plan-global", displayName: "Kimi Code (kimi.ai)", fetchedAt: new Date(Date.now() - 5 * 60000).toISOString(),
   source: "api", stale: false,
   windows: [{ kind: "5h", label: "5-hour", usedPercent: 42, used: 1218, limit: 2900, remaining: 1682, resetsAt: "2026-09-16T14:05:00Z", status: "ok" }],
   extras: { "Booster wallet": "3.21" }, error: null,
@@ -36,11 +36,11 @@ describe("renderText", () => {
   });
   it("renders errors", () => {
     const out = renderText([{ ...base, source: "error", error: "no credential found", windows: [] }]);
-    expect(out).toContain("⚠ Kimi Code: no credential found");
+    expect(out).toContain("⚠ Kimi Code (kimi.ai): no credential found");
   });
 });
 describe("renderJson", () => {
   it("emits parseable JSON", () => {
-    expect(JSON.parse(renderJson([base]))[0].provider).toBe("kimi-for-coding");
+    expect(JSON.parse(renderJson([base]))[0].provider).toBe("kimi-code-plan-global");
   });
 });

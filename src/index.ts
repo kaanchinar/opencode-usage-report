@@ -4,12 +4,14 @@ import { DEFAULT_OPTIONS, collectReports } from "./report.js";
 import { renderJson, renderText } from "./render.js";
 import { checkWarnings } from "./warn.js";
 import { toNumber } from "./normalize.js";
+import { adapters } from "./providers/index.js";
 import type { PluginOptions } from "./types.js";
 
 const WARN_THROTTLE_MS = 10 * 60 * 1000;
 
 const TOOL_DESCRIPTION =
-  "Show subscription usage/quota windows (5h, weekly, monthly) for configured inference providers (kimi-for-coding, opencode-go)";
+  "Show subscription usage/quota windows (5h, weekly, monthly) for configured inference providers " +
+  `(${adapters.map((adapter) => adapter.id).join(", ")})`;
 
 const COMMAND_TEMPLATE =
   "Call the usage_report tool with these arguments: $ARGUMENTS and present the result verbatim.";

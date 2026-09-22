@@ -43,11 +43,11 @@ describe("localEstimate", () => {
     const dir = mkdtempSync(join(tmpdir(), "fallback-"));
     const now = Date.now();
     makeDb(dir, [
-      { providerID: "kimi-for-coding", tokens: { total: 100 }, at: now - 60_000 },
-      { providerID: "kimi-for-coding", tokens: { total: 250 }, at: now - 2 * 3600_000 },
-      { providerID: "kimi-for-coding", tokens: { total: 400 }, at: now - 3 * 24 * 3600_000 },
+      { providerID: "kimi-code-plan-global", tokens: { total: 100 }, at: now - 60_000 },
+      { providerID: "kimi-code-plan-global", tokens: { total: 250 }, at: now - 2 * 3600_000 },
+      { providerID: "kimi-code-plan-global", tokens: { total: 400 }, at: now - 3 * 24 * 3600_000 },
     ]);
-    const result = await localEstimate("kimi-for-coding", env(dir));
+    const result = await localEstimate("kimi-code-plan-global", env(dir));
     expect(result).not.toBeNull();
     const five = result!.windows.find((w) => w.kind === "5h");
     const weekly = result!.windows.find((w) => w.kind === "weekly");
@@ -60,7 +60,7 @@ describe("localEstimate", () => {
 
   it("returns null when the db file is missing", async () => {
     const dir = mkdtempSync(join(tmpdir(), "fallback-"));
-    expect(await localEstimate("kimi-for-coding", env(dir))).toBeNull();
+    expect(await localEstimate("kimi-code-plan-global", env(dir))).toBeNull();
   });
 
   it("returns null when there is no message table", async () => {
@@ -68,21 +68,21 @@ describe("localEstimate", () => {
     const db = new DatabaseSync(join(dir, "opencode.db"));
     db.exec("CREATE TABLE unrelated (id text);");
     db.close();
-    expect(await localEstimate("kimi-for-coding", env(dir))).toBeNull();
+    expect(await localEstimate("kimi-code-plan-global", env(dir))).toBeNull();
   });
 
   it("returns null when no rows match the provider", async () => {
     const dir = mkdtempSync(join(tmpdir(), "fallback-"));
     const now = Date.now();
     makeDb(dir, [{ providerID: "other", tokens: { total: 10 }, at: now - 1000 }]);
-    expect(await localEstimate("kimi-for-coding", env(dir))).toBeNull();
+    expect(await localEstimate("kimi-code-plan-global", env(dir))).toBeNull();
   });
 
   it("falls back to message counts when tokens are absent", async () => {
     const dir = mkdtempSync(join(tmpdir(), "fallback-"));
     const now = Date.now();
-    makeDb(dir, [{ providerID: "kimi-for-coding", at: now - 1000 }]);
-    const result = await localEstimate("kimi-for-coding", env(dir));
+    makeDb(dir, [{ providerID: "kimi-code-plan-global", at: now - 1000 }]);
+    const result = await localEstimate("kimi-code-plan-global", env(dir));
     expect(result).not.toBeNull();
     expect(result!.windows.find((w) => w.kind === "5h")?.used).toBe(1);
   });
@@ -91,10 +91,10 @@ describe("localEstimate", () => {
     const dir = mkdtempSync(join(tmpdir(), "fallback-"));
     const now = Date.now();
     makeDb(dir, [
-      { providerID: "kimi-for-coding", at: now - 1000, data: "{not json" },
-      { providerID: "kimi-for-coding", tokens: { total: 7 }, at: now - 1000 },
+      { providerID: "kimi-code-plan-global", at: now - 1000, data: "{not json" },
+      { providerID: "kimi-code-plan-global", tokens: { total: 7 }, at: now - 1000 },
     ]);
-    const result = await localEstimate("kimi-for-coding", env(dir));
+    const result = await localEstimate("kimi-code-plan-global", env(dir));
     expect(result?.windows.find((w) => w.kind === "5h")?.used).toBe(7);
   });
 });

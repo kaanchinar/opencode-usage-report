@@ -3,13 +3,14 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// Registry + fallback are mocked so no network/DB is touched. Both providers are
+// Registry + fallback are mocked so no network/DB is touched. All providers are
 // present so the "known providers" list in the unknown-id error matches reality.
 const h = vi.hoisted(() => {
   const fetchMock = vi.fn();
   const localEstimateMock = vi.fn();
   const adapters = [
-    { id: "kimi-for-coding", displayName: "Kimi Code", fetch: fetchMock },
+    { id: "kimi-code-plan-global", displayName: "Kimi Code (kimi.ai)", fetch: fetchMock },
+    { id: "kimi-code-plan-cn", displayName: "Kimi Code (kimi.com)", fetch: fetchMock },
     { id: "opencode-go", displayName: "OpenCode Go", fetch: fetchMock },
   ];
   return { fetchMock, localEstimateMock, adapters };
@@ -31,7 +32,13 @@ const KEY = "test-key-abcdef123456";
 
 const env = (dir: string, extra: Record<string, string> = {}) =>
   ({ OPENCODE_DATA_HOME: dir, ...extra }) as unknown as NodeJS.ProcessEnv;
-const credEnv = (dir: string) => env(dir, { OPENCODE_USAGE_KIMI_FOR_CODING_KEY: KEY });
+const credEnv = (dir: string) => env(dir, { OPENCODE_USAGE_KIMI_CODE_PLAN_GLOBAL_KEY: KEY });
+const allCredEnv = (dir: string) =>
+  env(dir, {
+    OPENCODE_USAGE_KIMI_CODE_PLAN_GLOBAL_KEY: KEY,
+    OPENCODE_USAGE_KIMI_CODE_PLAN_CN_KEY: KEY,
+    OPENCODE_USAGE_OPENCODE_GO_KEY: KEY,
+  });
 
 const result: AdapterResult = {
   windows: [
@@ -63,28 +70,28 @@ describe("collectReports", () => {
     expect(reports[0].provider).toBe("nope");
     expect(reports[0].source).toBe("error");
     expect(reports[0].error).toBe(
-      "unknown provider 'nope' (known: kimi-for-coding, opencode-go)",
+      "unknown provider 'nope' (known: kimi-code-plan-global, kimi-code-plan-cn, opencode-go)",
     );
     expect(h.fetchMock).not.toHaveBeenCalled();
   });
 
-  it("returns a no-credential error row when nothing resolves", async () => {
+  it("returns a no-credential error row when an explicitly requested provider has none", async () => {
     const reports = await collectReports({
-      providers: ["kimi-for-coding"],
+      providers: ["kimi-code-plan-global"],
       env: env(freshDir()), // empty data home, no env override
     });
     expect(reports[0].source).toBe("error");
-    expect(reports[0].displayName).toBe("Kimi Code");
+    expect(reports[0].displayName).toBe("Kimi Code (kimi.ai)");
     expect(reports[0].error).toBe("no credential found");
     expect(h.fetchMock).not.toHaveBeenCalled();
   });
 
   it("serves a fresh cache entry without calling the adapter", async () => {
     const dir = freshDir();
-    await writeCache("kimi-for-coding", result, env(dir));
+    await writeCache("kimi-code-plan-global", result, env(dir));
 
     const reports = await collectReports({
-      providers: ["kimi-for-coding"],
+      providers: ["kimi-code-plan-global"],
       options: { cacheTtlSeconds: 120 },
       env: credEnv(dir),
     });
@@ -102,23 +109,23 @@ describe("collectReports", () => {
     h.fetchMock.mockResolvedValue(result);
 
     const reports = await collectReports({
-      providers: ["kimi-for-coding"],
+      providers: ["kimi-code-plan-global"],
       env: credEnv(dir),
     });
 
     expect(reports[0].source).toBe("api");
     expect(reports[0].stale).toBe(false);
     expect(h.fetchMock).toHaveBeenCalledOnce();
-    expect(await readCache("kimi-for-coding", 120, env(dir))).not.toBeNull();
+    expect(await readCache("kimi-code-plan-global", 120, env(dir))).not.toBeNull();
   });
 
   it("bypasses a fresh cache when refresh is requested", async () => {
     const dir = freshDir();
-    await writeCache("kimi-for-coding", result, env(dir));
+    await writeCache("kimi-code-plan-global", result, env(dir));
     h.fetchMock.mockResolvedValue(result);
 
     const reports = await collectReports({
-      providers: ["kimi-for-coding"],
+      providers: ["kimi-code-plan-global"],
       refresh: true,
       options: { cacheTtlSeconds: 120 },
       env: credEnv(dir),
@@ -139,7 +146,7 @@ describe("collectReports", () => {
     });
 
     const reports = await collectReports({
-      providers: ["kimi-for-coding"],
+      providers: ["kimi-code-plan-global"],
       options: { fallback: true },
       env: credEnv(dir),
     });
@@ -152,11 +159,11 @@ describe("collectReports", () => {
 
   it("serves stale cache (stale: true) when the adapter throws and a cache exists", async () => {
     const dir = freshDir();
-    await writeCache("kimi-for-coding", result, env(dir));
+    await writeCache("kimi-code-plan-global", result, env(dir));
     h.fetchMock.mockRejectedValue(new AdapterError("network", "down"));
 
     const reports = await collectReports({
-      providers: ["kimi-for-coding"],
+      providers: ["kimi-code-plan-global"],
       options: { cacheTtlSeconds: -1 }, // force the fetch path
       env: credEnv(dir),
     });
@@ -172,7 +179,7 @@ describe("collectReports", () => {
     h.fetchMock.mockRejectedValue(new AdapterError("network", "boom"));
 
     const reports = await collectReports({
-      providers: ["kimi-for-coding"],
+      providers: ["kimi-code-plan-global"],
       options: { fallback: false },
       env: credEnv(dir),
     });
@@ -188,7 +195,7 @@ describe("collectReports", () => {
     h.localEstimateMock.mockResolvedValue(null);
 
     const reports = await collectReports({
-      providers: ["kimi-for-coding"],
+      providers: ["kimi-code-plan-global"],
       options: { fallback: true },
       env: credEnv(dir),
     });
@@ -210,23 +217,45 @@ describe("collectReports", () => {
     expect(reports[0].provider).toBe("opencode-go");
   });
 
-  it("collects every registered provider by default", async () => {
+  it("collects every configured provider by default", async () => {
     const dir = freshDir();
     h.fetchMock.mockResolvedValue(result);
 
+    const reports = await collectReports({ env: allCredEnv(dir) });
+    expect(reports.map((r) => r.provider)).toEqual([
+      "kimi-code-plan-global",
+      "kimi-code-plan-cn",
+      "opencode-go",
+    ]);
+  });
+
+  it("skips unconfigured providers by default without skipping configured ones", async () => {
+    const dir = freshDir();
+    h.fetchMock.mockResolvedValue(result);
+
+    // Only the global Kimi credential is set: the CN plan and opencode-go must
+    // not appear as error rows in the default view.
     const reports = await collectReports({ env: credEnv(dir) });
-    expect(reports.map((r) => r.provider)).toEqual(["kimi-for-coding", "opencode-go"]);
+    expect(reports.map((r) => r.provider)).toEqual(["kimi-code-plan-global"]);
   });
 
   it("treats an empty provider filter as all providers", async () => {
     const dir = freshDir();
     h.fetchMock.mockResolvedValue(result);
 
-    const viaArg = await collectReports({ providers: [], env: credEnv(dir) });
-    expect(viaArg.map((r) => r.provider)).toEqual(["kimi-for-coding", "opencode-go"]);
+    const viaArg = await collectReports({ providers: [], env: allCredEnv(dir) });
+    expect(viaArg.map((r) => r.provider)).toEqual([
+      "kimi-code-plan-global",
+      "kimi-code-plan-cn",
+      "opencode-go",
+    ]);
 
-    const viaOptions = await collectReports({ options: { providers: [] }, env: credEnv(dir) });
-    expect(viaOptions.map((r) => r.provider)).toEqual(["kimi-for-coding", "opencode-go"]);
+    const viaOptions = await collectReports({ options: { providers: [] }, env: allCredEnv(dir) });
+    expect(viaOptions.map((r) => r.provider)).toEqual([
+      "kimi-code-plan-global",
+      "kimi-code-plan-cn",
+      "opencode-go",
+    ]);
   });
 
   it("never leaks key material into error reports", async () => {
@@ -234,7 +263,7 @@ describe("collectReports", () => {
     h.fetchMock.mockRejectedValue(new AdapterError("auth", `rejected key ${KEY}`));
 
     const reports = await collectReports({
-      providers: ["kimi-for-coding"],
+      providers: ["kimi-code-plan-global"],
       options: { fallback: false },
       env: credEnv(dir),
     });

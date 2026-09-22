@@ -1,6 +1,6 @@
 {
   "name": "opencode-usage-report",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "opencode plugin: /usage command showing subscription quota windows for configured providers",
   "author": "Kaan Chinar",
   "type": "module",

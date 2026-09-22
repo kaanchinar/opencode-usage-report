@@ -9,11 +9,22 @@ import { AdapterError } from "../types.js";
 import { pick, ratioToPercent, toISODate, toNumber, windowFromCounts } from "../normalize.js";
 import { redact } from "../auth.js";
 
-const VERSION = "0.1.0";
-const ENDPOINT = "https://api.kimi.com/coding/v1/usages";
+const VERSION = "0.2.0";
 
-function request(cred: Credential, opts: FetchOptions): Promise<Response> {
-  return fetch(ENDPOINT, {
+/**
+ * Kimi Code is split by region in opencode/models.dev: the global plan lives on
+ * api.kimi.ai and the mainland-China plan on api.kimi.com. Both expose the same
+ * `GET <base>/usages` contract, so one factory builds both adapters.
+ */
+export interface KimiAdapterConfig {
+  id: string;
+  displayName: string;
+  /** API base including the version segment, e.g. "https://api.kimi.ai/coding/v1". */
+  baseUrl: string;
+}
+
+function request(cred: Credential, opts: FetchOptions, endpoint: string): Promise<Response> {
+  return fetch(endpoint, {
     method: "GET",
     headers: {
       Authorization: "Bearer " + cred.key,
@@ -25,11 +36,15 @@ function request(cred: Credential, opts: FetchOptions): Promise<Response> {
 }
 
 /** One retry on network throw or 5xx; 4xx and 2xx return immediately. */
-async function fetchWithRetry(cred: Credential, opts: FetchOptions): Promise<Response> {
+async function fetchWithRetry(
+  cred: Credential,
+  opts: FetchOptions,
+  endpoint: string,
+): Promise<Response> {
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await request(cred, opts);
+      const res = await request(cred, opts, endpoint);
       if (res.status >= 500) {
         lastError = new Error(`HTTP ${res.status}`);
         continue;
@@ -157,42 +172,59 @@ function parse(body: Record<string, unknown>, cred: Credential): AdapterResult {
   return { windows, extras };
 }
 
-export const kimiAdapter: ProviderAdapter = {
-  id: "kimi-for-coding",
-  displayName: "Kimi Code",
-  async fetch(cred: Credential, opts: FetchOptions): Promise<AdapterResult> {
-    const res = await fetchWithRetry(cred, opts);
+export function createKimiAdapter(config: KimiAdapterConfig): ProviderAdapter {
+  const endpoint = `${config.baseUrl}/usages`;
+  return {
+    id: config.id,
+    displayName: config.displayName,
+    async fetch(cred: Credential, opts: FetchOptions): Promise<AdapterResult> {
+      const res = await fetchWithRetry(cred, opts, endpoint);
 
-    if (res.status === 401) {
-      throw new AdapterError("auth", redact("invalid Kimi API key", cred.key));
-    }
-    if (res.status === 429) {
-      throw new AdapterError("rate-limited", redact("Kimi API rate limit exceeded", cred.key));
-    }
-    if (res.status < 200 || res.status >= 300) {
-      throw new AdapterError(
-        "bad-response",
-        redact(`Kimi API returned HTTP ${res.status}`, cred.key),
-      );
-    }
+      if (res.status === 401) {
+        throw new AdapterError("auth", redact("invalid Kimi API key", cred.key));
+      }
+      if (res.status === 429) {
+        throw new AdapterError("rate-limited", redact("Kimi API rate limit exceeded", cred.key));
+      }
+      if (res.status < 200 || res.status >= 300) {
+        throw new AdapterError(
+          "bad-response",
+          redact(`Kimi API returned HTTP ${res.status}`, cred.key),
+        );
+      }
 
-    let body: unknown;
-    try {
-      body = await res.json();
-    } catch {
-      throw new AdapterError(
-        "bad-response",
-        redact("Kimi API returned a non-JSON response", cred.key),
-      );
-    }
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch {
+        throw new AdapterError(
+          "bad-response",
+          redact("Kimi API returned a non-JSON response", cred.key),
+        );
+      }
 
-    if (body === null || typeof body !== "object" || Array.isArray(body)) {
-      throw new AdapterError(
-        "bad-response",
-        redact("Kimi API returned an unexpected response shape", cred.key),
-      );
-    }
+      if (body === null || typeof body !== "object" || Array.isArray(body)) {
+        throw new AdapterError(
+          "bad-response",
+          redact("Kimi API returned an unexpected response shape", cred.key),
+        );
+      }
 
-    return parse(body as Record<string, unknown>, cred);
-  },
-};
+      return parse(body as Record<string, unknown>, cred);
+    },
+  };
+}
+
+/** Kimi For Coding (kimi.ai) — the global `kimi-code-plan-global` provider. */
+export const kimiGlobalAdapter: ProviderAdapter = createKimiAdapter({
+  id: "kimi-code-plan-global",
+  displayName: "Kimi Code (kimi.ai)",
+  baseUrl: "https://api.kimi.ai/coding/v1",
+});
+
+/** Kimi For Coding (kimi.com) — the mainland-China `kimi-code-plan-cn` provider. */
+export const kimiCnAdapter: ProviderAdapter = createKimiAdapter({
+  id: "kimi-code-plan-cn",
+  displayName: "Kimi Code (kimi.com)",
+  baseUrl: "https://api.kimi.com/coding/v1",
+});

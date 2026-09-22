@@ -69,9 +69,14 @@ async function collectOne(
   options: PluginOptions,
   refresh: boolean,
   env: NodeJS.ProcessEnv,
-): Promise<ProviderReport> {
+  explicit: boolean,
+): Promise<ProviderReport | null> {
   const cred = resolveCredential(id, { env });
-  if (cred === null) return errorReport(id, adapter.displayName, "no credential found");
+  if (cred === null) {
+    // The default view lists only providers that are actually configured; a
+    // provider the user asked for by name still reports the missing credential.
+    return explicit ? errorReport(id, adapter.displayName, "no credential found") : null;
+  }
 
   if (!refresh) {
     const cached = await readCache(id, options.cacheTtlSeconds, env);
@@ -126,8 +131,9 @@ async function collectOne(
 
 /**
  * Collects normalized usage reports for the requested providers (default: every
- * registered adapter). Never throws: each provider is isolated and failures
- * surface as `source: "error"` rows.
+ * configured adapter; unconfigured ones are skipped unless requested by name).
+ * Never throws: each provider is isolated and failures surface as
+ * `source: "error"` rows.
  */
 export async function collectReports(opts: CollectReportsOptions = {}): Promise<ProviderReport[]> {
   const options: PluginOptions = { ...DEFAULT_OPTIONS, ...(opts.options ?? {}) };
@@ -135,10 +141,9 @@ export async function collectReports(opts: CollectReportsOptions = {}): Promise<
   const refresh = opts.refresh === true;
 
   // An empty filter is treated like "no filter": report every registered adapter.
-  const ids =
-    firstNonEmpty(opts.providers) ??
-    firstNonEmpty(options.providers) ??
-    adapters.map((adapter) => adapter.id);
+  const requested = firstNonEmpty(opts.providers) ?? firstNonEmpty(options.providers);
+  const ids = requested ?? adapters.map((adapter) => adapter.id);
+  const explicit = requested !== null;
   const reports: ProviderReport[] = [];
 
   for (const id of ids) {
@@ -150,7 +155,8 @@ export async function collectReports(opts: CollectReportsOptions = {}): Promise<
     }
 
     try {
-      reports.push(await collectOne(id, adapter, options, refresh, env));
+      const report = await collectOne(id, adapter, options, refresh, env, explicit);
+      if (report !== null) reports.push(report);
     } catch {
       // Last-resort isolation: never let one provider break the whole report.
       reports.push(errorReport(id, adapter.displayName, "internal error while collecting usage"));

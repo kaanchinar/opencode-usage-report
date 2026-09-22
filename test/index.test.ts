@@ -29,8 +29,8 @@ const window90: UsageWindow = {
 };
 
 const report: ProviderReport = {
-  provider: "kimi-for-coding",
-  displayName: "Kimi Code",
+  provider: "kimi-code-plan-global",
+  displayName: "Kimi Code (kimi.ai)",
   fetchedAt: "2026-09-16T12:00:00Z",
   source: "api",
   stale: false,
@@ -40,10 +40,10 @@ const report: ProviderReport = {
 };
 
 const hit = {
-  provider: "kimi-for-coding",
-  displayName: "Kimi Code",
+  provider: "kimi-code-plan-global",
+  displayName: "Kimi Code (kimi.ai)",
   window: window90,
-  message: "Kimi Code 5-hour window at 90%",
+  message: "Kimi Code (kimi.ai) 5-hour window at 90%",
 };
 
 type EventArg = Parameters<NonNullable<Hooks["event"]>>[0];
