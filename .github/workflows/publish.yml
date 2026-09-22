@@ -1,0 +1,32 @@
+name: Publish
+
+# Publishes to npm when a v* tag is pushed, or manually via workflow_dispatch.
+# Uses npm Trusted Publishing (OIDC): no NPM_TOKEN secret is needed after the
+# publisher is configured once at
+# https://www.npmjs.com/package/opencode-usage-report/access
+# (GitHub Actions: owner kaanchinar, repo opencode-usage-report, workflow publish.yml).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - name: Verify tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - run: npm ci
+      # prepublishOnly runs typecheck + tests before the upload.
+      - run: npm publish --provenance --access public
