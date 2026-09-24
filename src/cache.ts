@@ -1,8 +1,8 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import type { AdapterResult } from "./types.js";
-import { pluginStateDir } from "./paths.js";
+import type { AdapterResult } from "./types";
+import { pluginStateDir } from "./paths";
 
 export interface CacheEntry {
   fetchedAt: string;

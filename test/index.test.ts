@@ -4,18 +4,19 @@ import type { Hooks, PluginInput } from "@opencode-ai/plugin";
 // report/warn are mocked so plugin wiring can be exercised without network,
 // disk state, or the 10-minute throttle depending on real collection.
 const h = vi.hoisted(() => ({
-  collectReports: vi.fn(),
-  checkWarnings: vi.fn(),
+  collectReports: vi.fn<() => Promise<ProviderReport[]>>(),
+  checkWarnings: vi.fn<() => Promise<WarnHit[]>>(),
 }));
 
-vi.mock("../src/report.js", () => ({
+vi.mock("@/report", () => ({
   collectReports: h.collectReports,
   DEFAULT_OPTIONS: { thresholdPercent: 80, cacheTtlSeconds: 120, providers: null, fallback: true },
 }));
-vi.mock("../src/warn.js", () => ({ checkWarnings: h.checkWarnings }));
+vi.mock("@/warn", () => ({ checkWarnings: h.checkWarnings }));
 
-import plugin from "../src/index.js";
-import type { ProviderReport, UsageWindow } from "../src/types.js";
+import plugin from "@/index";
+import type { ProviderReport, UsageWindow } from "@/types";
+import type { WarnHit } from "@/warn";
 
 const window90: UsageWindow = {
   kind: "5h",
@@ -53,7 +54,9 @@ const idleEvent: EventArg = {
   event: { type: "session.idle", properties: { sessionID: "ses_mock" } },
 };
 
-function makeHooks(showToast = vi.fn().mockResolvedValue({})): Promise<Hooks> {
+function makeHooks(
+  showToast = vi.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue({}),
+): Promise<Hooks> {
   const client = { tui: { showToast } } as unknown as PluginInput["client"];
   return plugin({ client } as unknown as PluginInput, undefined);
 }
@@ -91,7 +94,9 @@ describe("index plugin wiring", () => {
   it("swallows showToast rejections on session.idle (headless mode)", async () => {
     h.collectReports.mockResolvedValue([report]);
     h.checkWarnings.mockResolvedValue([hit]);
-    const showToast = vi.fn().mockRejectedValue(new Error("tui unavailable"));
+    const showToast = vi
+      .fn<(...args: unknown[]) => Promise<unknown>>()
+      .mockRejectedValue(new Error("tui unavailable"));
     const hooks = await makeHooks(showToast);
 
     await expect(hooks.event!(idleEvent)).resolves.toBeUndefined();
@@ -103,7 +108,7 @@ describe("index plugin wiring", () => {
   it("runs a single throttled warning check at startup (spec §3.6)", async () => {
     h.collectReports.mockResolvedValue([report]);
     h.checkWarnings.mockResolvedValue([hit]);
-    const showToast = vi.fn().mockResolvedValue({});
+    const showToast = vi.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue({});
     const hooks = await makeHooks(showToast);
 
     expect(h.collectReports).not.toHaveBeenCalled(); // fire-and-forget, not synchronous

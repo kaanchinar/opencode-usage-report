@@ -6,8 +6,8 @@ import { join } from "node:path";
 // Registry + fallback are mocked so no network/DB is touched. All providers are
 // present so the "known providers" list in the unknown-id error matches reality.
 const h = vi.hoisted(() => {
-  const fetchMock = vi.fn();
-  const localEstimateMock = vi.fn();
+  const fetchMock = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+  const localEstimateMock = vi.fn<(...args: unknown[]) => Promise<unknown>>();
   const adapters = [
     { id: "kimi-code-plan-global", displayName: "Kimi Code (kimi.ai)", fetch: fetchMock },
     { id: "kimi-code-plan-cn", displayName: "Kimi Code (kimi.com)", fetch: fetchMock },
@@ -16,17 +16,17 @@ const h = vi.hoisted(() => {
   return { fetchMock, localEstimateMock, adapters };
 });
 
-vi.mock("../src/providers/index.js", () => ({
+vi.mock("@/providers/index", () => ({
   adapters: h.adapters,
   getAdapter: (id: string) => h.adapters.find((a) => a.id === id),
 }));
 
-vi.mock("../src/fallback.js", () => ({ localEstimate: h.localEstimateMock }));
+vi.mock("@/fallback", () => ({ localEstimate: h.localEstimateMock }));
 
-import { collectReports, DEFAULT_OPTIONS } from "../src/report.js";
-import { readCache, writeCache } from "../src/cache.js";
-import { AdapterError } from "../src/types.js";
-import type { AdapterResult } from "../src/types.js";
+import { collectReports, DEFAULT_OPTIONS } from "@/report";
+import { readCache, writeCache } from "@/cache";
+import { AdapterError } from "@/types";
+import type { AdapterResult } from "@/types";
 
 const KEY = "test-key-abcdef123456";
 
@@ -42,7 +42,16 @@ const allCredEnv = (dir: string) =>
 
 const result: AdapterResult = {
   windows: [
-    { kind: "5h", label: "5-hour", usedPercent: 12, used: null, limit: null, remaining: null, resetsAt: null, status: "ok" },
+    {
+      kind: "5h",
+      label: "5-hour",
+      usedPercent: 12,
+      used: null,
+      limit: null,
+      remaining: null,
+      resetsAt: null,
+      status: "ok",
+    },
   ],
   extras: { Plan: "Pro" },
 };
@@ -140,7 +149,16 @@ describe("collectReports", () => {
     h.fetchMock.mockRejectedValue(new AdapterError("network", "boom"));
     h.localEstimateMock.mockResolvedValue({
       windows: [
-        { kind: "5h", label: "5-hour (local estimate)", usedPercent: null, used: 3, limit: null, remaining: null, resetsAt: null, status: "ok" },
+        {
+          kind: "5h",
+          label: "5-hour (local estimate)",
+          usedPercent: null,
+          used: 3,
+          limit: null,
+          remaining: null,
+          resetsAt: null,
+          status: "ok",
+        },
       ],
       extras: { source: "opencode.db" },
     });

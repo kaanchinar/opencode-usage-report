@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import type { AdapterResult, UsageWindow } from "./types.js";
-import { dbPath } from "./paths.js";
+import type { AdapterResult, UsageWindow } from "./types";
+import { dbPath } from "./paths";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;

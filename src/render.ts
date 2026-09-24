@@ -1,4 +1,4 @@
-import type { ProviderReport, UsageWindow } from "./types.js";
+import type { ProviderReport, UsageWindow } from "./types";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -38,7 +38,7 @@ function header(report: ProviderReport, now: Date): string {
   return `${report.displayName} (${parts.join(", ")})`;
 }
 
-function windowLine(report: ProviderReport, w: UsageWindow, now: Date): string {
+function windowLine(report: ProviderReport, w: UsageWindow, now: Date, labelWidth: number): string {
   // Local estimates always carry the `~` marker, even when only absolutes are
   // known (percent is null): a bare em dash would hide that the row is estimated.
   const isEstimate = report.source === "local-estimate";
@@ -48,10 +48,11 @@ function windowLine(report: ProviderReport, w: UsageWindow, now: Date): string {
       : isEstimate
         ? "~estimate"
         : "—";
-  let line = `  ${w.label.padEnd(LABEL_WIDTH)}${percent.padEnd(PERCENT_WIDTH)}`;
+  let line = `  ${w.label.padEnd(labelWidth)}${percent.padEnd(PERCENT_WIDTH)}`;
 
   if (w.used !== null && w.limit !== null) {
-    line += `${formatNumber(w.used)} / ${formatNumber(w.limit)} reqs`.padEnd(ABSOLUTES_WIDTH);
+    const unit = /credit/i.test(w.label) ? "credits" : "reqs";
+    line += `${formatNumber(w.used)} / ${formatNumber(w.limit)} ${unit}`.padEnd(ABSOLUTES_WIDTH);
   }
   if (w.resetsAt !== null) {
     const reset = formatReset(w.resetsAt, now);
@@ -63,13 +64,17 @@ function windowLine(report: ProviderReport, w: UsageWindow, now: Date): string {
 /** Renders provider reports as a human-readable text table (spec §3.8). */
 export function renderText(reports: ProviderReport[], opts?: { now?: Date }): string {
   const now = opts?.now ?? new Date();
+  const labelWidth = Math.max(
+    LABEL_WIDTH,
+    ...reports.flatMap((report) => report.windows.map((w) => w.label.length + 1)),
+  );
   const blocks = reports.map((report) => {
     if (report.source === "error") {
       return `⚠ ${report.displayName}: ${report.error ?? "unknown error"}`;
     }
     const lines = [header(report, now)];
     for (const w of report.windows) {
-      lines.push(windowLine(report, w, now));
+      lines.push(windowLine(report, w, now, labelWidth));
     }
     for (const [key, value] of Object.entries(report.extras)) {
       lines.push(`  ${key}: ${value}`);

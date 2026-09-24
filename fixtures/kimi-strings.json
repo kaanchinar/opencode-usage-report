@@ -1,9 +1,0 @@
-{
-  "usage": { "limit": "2900", "used": "1769", "remaining": "1131", "resetAt": "2026-09-22T00:00:00Z" },
-  "limits": [
-    { "window": { "duration": 300, "timeUnit": "TIME_UNIT_MINUTE" },
-      "detail": { "limit": "2900", "used": "1218", "remaining": "1682", "resetAt": "2026-09-16T14:05:00Z" } }
-  ],
-  "booster_wallet": { "balance": "3.21" },
-  "user": { "membership": { "level": "LEVEL_PRO" } }
-}

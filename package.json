@@ -2,45 +2,49 @@
   "name": "opencode-usage-report",
   "version": "0.2.0",
   "description": "opencode plugin: /usage command showing subscription quota windows for configured providers",
+  "keywords": [
+    "kimi",
+    "opencode",
+    "opencode-plugin",
+    "quota",
+    "rate-limit",
+    "tui",
+    "usage"
+  ],
+  "homepage": "https://github.com/kaanchinar/opencode-usage-report#readme",
+  "bugs": {
+    "url": "https://github.com/kaanchinar/opencode-usage-report/issues"
+  },
+  "license": "MIT",
   "author": "Kaan Chinar",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kaanchinar/opencode-usage-report.git"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
   "type": "module",
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
     "./tui": "./src/tui.tsx"
   },
-  "files": [
-    "src",
-    "README.md"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/kaanchinar/opencode-usage-report.git"
+  "publishConfig": {
+    "access": "public"
   },
-  "bugs": {
-    "url": "https://github.com/kaanchinar/opencode-usage-report/issues"
-  },
-  "homepage": "https://github.com/kaanchinar/opencode-usage-report#readme",
-  "keywords": [
-    "opencode",
-    "opencode-plugin",
-    "usage",
-    "quota",
-    "rate-limit",
-    "kimi",
-    "tui"
-  ],
   "scripts": {
-    "test": "vitest run",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "smoke": "tsx scripts/live-smoke.ts",
-    "prepublishOnly": "npm run typecheck && npm test"
-  },
-  "peerDependencies": {
-    "@opencode-ai/plugin": "*",
-    "@opentui/core": ">=0.5.11",
-    "@opentui/solid": ">=0.5.11",
-    "solid-js": ">=1.9.0"
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm test",
+    "prepublishOnly": "npm run lint && npm run format:check && npm run typecheck && npm test"
   },
   "devDependencies": {
     "@opencode-ai/plugin": "^1.0.0",
@@ -48,13 +52,17 @@
     "@opentui/keymap": "^0.5.11",
     "@opentui/solid": "^0.5.11",
     "@types/node": "^26.6.2",
+    "oxfmt": "^0.70.0",
+    "oxlint": "^1.85.0",
     "solid-js": "1.9.12",
     "tsx": "^4.19.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
   },
-  "license": "MIT",
-  "publishConfig": {
-    "access": "public"
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*",
+    "@opentui/core": ">=0.5.11",
+    "@opentui/solid": ">=0.5.11",
+    "solid-js": ">=1.9.0"
   }
 }

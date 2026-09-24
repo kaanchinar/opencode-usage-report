@@ -2,7 +2,7 @@
  * Pure formatting helpers for the TUI sidebar usage panel. No JSX, no Solid
  * imports (the only module dependency is the shared `DEFAULT_OPTIONS`).
  */
-import { DEFAULT_OPTIONS } from "./report.js";
+import { DEFAULT_OPTIONS } from "./report";
 
 export type ToneName = "success" | "warning" | "error" | "textMuted";
 
@@ -160,9 +160,7 @@ function toFiniteNumber(value: unknown): number | null {
  * `barWidth` is floored and clamped to 4..40; `refreshIntervalSeconds` is
  * rounded and clamped to 5..3600 so the timer can never hot-loop or overflow.
  */
-export function coerceTuiOptions(
-  raw: Record<string, unknown> | undefined,
-): ResolvedTuiOptions {
+export function coerceTuiOptions(raw: Record<string, unknown> | undefined): ResolvedTuiOptions {
   const opts: ResolvedTuiOptions = {
     cacheTtlSeconds: DEFAULT_OPTIONS.cacheTtlSeconds,
     thresholdPercent: DEFAULT_OPTIONS.thresholdPercent,

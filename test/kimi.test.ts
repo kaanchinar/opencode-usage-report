@@ -1,13 +1,18 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
-import { kimiCnAdapter, kimiGlobalAdapter } from "../src/providers/kimi.js";
-import { AdapterError } from "../src/types.js";
+import { kimiCnAdapter, kimiGlobalAdapter } from "@/providers/kimi";
 
 const cred = { type: "api" as const, key: "sk-test-key-123456" };
 const opts = { timeoutMs: 1000 };
-const fixture = (n: string) => JSON.parse(readFileSync(new URL(`../fixtures/${n}`, import.meta.url), "utf8"));
+const fixture = (n: string) =>
+  JSON.parse(readFileSync(new URL(`./fixtures/${n}`, import.meta.url), "utf8"));
 function mockFetch(status: number, body: unknown) {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(typeof body === "string" ? body : JSON.stringify(body), { status })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () => new Response(typeof body === "string" ? body : JSON.stringify(body), { status }),
+    ),
+  );
 }
 afterEach(() => vi.unstubAllGlobals());
 
@@ -28,7 +33,9 @@ describe("kimi adapters", () => {
   it("targets api.kimi.com for the CN plan", async () => {
     mockFetch(200, fixture("kimi-minimal.json"));
     await kimiCnAdapter.fetch(cred, opts);
-    expect((globalThis.fetch as any).mock.calls[0][0]).toBe("https://api.kimi.com/coding/v1/usages");
+    expect((globalThis.fetch as any).mock.calls[0][0]).toBe(
+      "https://api.kimi.com/coding/v1/usages",
+    );
   });
 });
 
@@ -36,9 +43,9 @@ describe("kimi response parsing", () => {
   it("parses canonical response preferring count-based windows", async () => {
     mockFetch(200, fixture("kimi-canonical.json"));
     const r = await kimiGlobalAdapter.fetch(cred, opts);
-    const fiveH = r.windows.find(w => w.kind === "5h")!;
+    const fiveH = r.windows.find((w) => w.kind === "5h")!;
     expect(fiveH.usedPercent).toBe(42);
-    const weekly = r.windows.find(w => w.kind === "weekly")!;
+    const weekly = r.windows.find((w) => w.kind === "weekly")!;
     expect(weekly.usedPercent).toBe(61);
     expect(r.extras?.["Plan"]).toBe("LEVEL_PRO");
     expect(r.extras?.["Booster wallet"]).toBe("3.21");
@@ -46,12 +53,12 @@ describe("kimi response parsing", () => {
   it("prefers authoritative counts over stale zeroed usages ratios (live regression)", async () => {
     mockFetch(200, fixture("kimi-stale-ratios.json"));
     const r = await kimiGlobalAdapter.fetch(cred, opts);
-    const fiveH = r.windows.find(w => w.kind === "5h")!;
+    const fiveH = r.windows.find((w) => w.kind === "5h")!;
     expect(fiveH.usedPercent).toBe(100);
     expect(fiveH.used).toBe(100);
     expect(fiveH.limit).toBe(100);
     expect(fiveH.resetsAt).toBe("2026-09-16T14:23:44.290Z");
-    const weekly = r.windows.find(w => w.kind === "weekly")!;
+    const weekly = r.windows.find((w) => w.kind === "weekly")!;
     expect(weekly.usedPercent).toBe(33);
     expect(weekly.used).toBe(33);
     expect(weekly.resetsAt).toBe("2026-09-20T20:23:44.290Z");
@@ -64,13 +71,13 @@ describe("kimi response parsing", () => {
       },
     });
     const r = await kimiGlobalAdapter.fetch(cred, opts);
-    expect(r.windows.find(w => w.kind === "5h")?.usedPercent).toBe(42);
-    expect(r.windows.find(w => w.kind === "weekly")?.usedPercent).toBe(61);
+    expect(r.windows.find((w) => w.kind === "5h")?.usedPercent).toBe(42);
+    expect(r.windows.find((w) => w.kind === "weekly")?.usedPercent).toBe(61);
   });
   it("falls back to limits[] and top-level usage with string counts", async () => {
     mockFetch(200, fixture("kimi-strings.json"));
     const r = await kimiGlobalAdapter.fetch(cred, opts);
-    const fiveH = r.windows.find(w => w.kind === "5h")!;
+    const fiveH = r.windows.find((w) => w.kind === "5h")!;
     expect(fiveH.used).toBe(1218);
     expect(fiveH.usedPercent).toBe(42);
     expect(fiveH.resetsAt).toBe("2026-09-16T14:05:00.000Z");
@@ -82,10 +89,13 @@ describe("kimi response parsing", () => {
     expect(r.windows[0].kind).toBe("weekly");
   });
   it("marks monthly frozen when totalQuota.used > 0", async () => {
-    const body = { ...fixture("kimi-minimal.json"), totalQuota: { limit: "10", used: "3", remaining: "7" } };
+    const body = {
+      ...fixture("kimi-minimal.json"),
+      totalQuota: { limit: "10", used: "3", remaining: "7" },
+    };
     mockFetch(200, body);
     const r = await kimiGlobalAdapter.fetch(cred, opts);
-    expect(r.windows.find(w => w.kind === "monthly")?.status).toBe("frozen");
+    expect(r.windows.find((w) => w.kind === "monthly")?.status).toBe("frozen");
   });
   it("sends Authorization and User-Agent headers", async () => {
     mockFetch(200, fixture("kimi-minimal.json"));
@@ -97,7 +107,9 @@ describe("kimi response parsing", () => {
   it("maps 401 to auth error without leaking key", async () => {
     mockFetch(401, { error: { message: "invalid token sk-test-key-123456" } });
     await expect(kimiGlobalAdapter.fetch(cred, opts)).rejects.toMatchObject({ kind: "auth" });
-    await expect(kimiGlobalAdapter.fetch(cred, opts)).rejects.toThrow(/<redacted>|invalid Kimi API key/);
+    await expect(kimiGlobalAdapter.fetch(cred, opts)).rejects.toThrow(
+      /<redacted>|invalid Kimi API key/,
+    );
   });
   it("throws network AdapterError after retry on 500", async () => {
     mockFetch(500, "oops");
@@ -138,8 +150,10 @@ describe("kimi response parsing", () => {
       usage: { limit: "100", used: "1", remaining: "99", resetsAt: "2026-09-22T00:00:00Z" },
     });
     const ratio = await kimiGlobalAdapter.fetch(cred, opts);
-    expect(ratio.windows.find(w => w.kind === "5h")?.resetsAt).toBe("2026-09-16T14:05:00.000Z");
-    expect(ratio.windows.find(w => w.kind === "weekly")?.resetsAt).toBe("2026-09-22T00:00:00.000Z");
+    expect(ratio.windows.find((w) => w.kind === "5h")?.resetsAt).toBe("2026-09-16T14:05:00.000Z");
+    expect(ratio.windows.find((w) => w.kind === "weekly")?.resetsAt).toBe(
+      "2026-09-22T00:00:00.000Z",
+    );
 
     mockFetch(200, {
       limits: [
@@ -151,13 +165,15 @@ describe("kimi response parsing", () => {
       usage: { limit: "100", used: "1", resetsAt: "2026-09-22T00:00:00Z" },
     });
     const detail = await kimiGlobalAdapter.fetch(cred, opts);
-    expect(detail.windows.find(w => w.kind === "5h")?.resetsAt).toBe("2026-09-16T15:05:00.000Z");
+    expect(detail.windows.find((w) => w.kind === "5h")?.resetsAt).toBe("2026-09-16T15:05:00.000Z");
 
     mockFetch(200, {
       usage: { limit: "100", used: "1", resetsAt: "2026-09-22T00:00:00Z" },
       totalQuota: { limit: "10", used: "3", remaining: "7", resetsAt: "2026-10-01T00:00:00Z" },
     });
     const quota = await kimiGlobalAdapter.fetch(cred, opts);
-    expect(quota.windows.find(w => w.kind === "monthly")?.resetsAt).toBe("2026-10-01T00:00:00.000Z");
+    expect(quota.windows.find((w) => w.kind === "monthly")?.resetsAt).toBe(
+      "2026-10-01T00:00:00.000Z",
+    );
   });
 });

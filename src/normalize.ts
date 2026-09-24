@@ -1,4 +1,4 @@
-import type { UsageWindow, WindowKind } from "./types.js";
+import type { UsageWindow, WindowKind } from "./types";
 
 /** Accepts a number or a numeric string; anything else (including NaN/Infinity) yields null. */
 export function toNumber(v: unknown): number | null {

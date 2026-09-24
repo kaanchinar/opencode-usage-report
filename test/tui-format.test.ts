@@ -7,7 +7,7 @@ import {
   percentText,
   toneFor,
   windowLabel,
-} from "../src/tui-format.js";
+} from "@/tui-format";
 
 describe("bar", () => {
   it("renders empty, partial, and full bars", () => {
@@ -124,9 +124,7 @@ describe("percentText", () => {
   });
 
   it("falls back to used/limit", () => {
-    expect(percentText({ usedPercent: null, used: 1218, limit: 2900 })).toBe(
-      "1,218/2,900",
-    );
+    expect(percentText({ usedPercent: null, used: 1218, limit: 2900 })).toBe("1,218/2,900");
   });
 
   it("falls back to a lone used count", () => {
@@ -159,7 +157,9 @@ describe("percentText", () => {
     expect(undefinedUsed).toBe("—");
     expect(undefinedLimit).toBe("—");
     expect(() =>
-      percentText({ used: undefined, limit: undefined } as unknown as Parameters<typeof percentText>[0]),
+      percentText({ used: undefined, limit: undefined } as unknown as Parameters<
+        typeof percentText
+      >[0]),
     ).not.toThrow();
   });
 });
@@ -219,10 +219,7 @@ describe("coerceTuiOptions", () => {
   });
 
   it("normalises providers", () => {
-    expect(coerceTuiOptions({ providers: ["a", 2, "b", null] }).providers).toEqual([
-      "a",
-      "b",
-    ]);
+    expect(coerceTuiOptions({ providers: ["a", 2, "b", null] }).providers).toEqual(["a", "b"]);
     expect(coerceTuiOptions({ providers: [] }).providers).toBeUndefined();
     expect(coerceTuiOptions({ providers: null }).providers).toBeUndefined();
   });

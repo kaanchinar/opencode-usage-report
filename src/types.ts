@@ -28,6 +28,8 @@ export interface ProviderReport {
 export interface Credential {
   type: "api" | "oauth";
   key: string;
+  /** Provider account id, when the auth entry carries one (e.g. ChatGPT). */
+  accountId?: string;
 }
 export interface AdapterResult {
   windows: UsageWindow[];
@@ -50,7 +52,10 @@ export interface PluginOptions {
 
 export type AdapterErrorKind = "auth" | "no-plan" | "rate-limited" | "network" | "bad-response";
 export class AdapterError extends Error {
-  constructor(public kind: AdapterErrorKind, message: string) {
+  constructor(
+    public kind: AdapterErrorKind,
+    message: string,
+  ) {
     super(message);
     this.name = "AdapterError";
   }

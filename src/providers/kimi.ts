@@ -4,10 +4,10 @@ import type {
   FetchOptions,
   ProviderAdapter,
   UsageWindow,
-} from "../types.js";
-import { AdapterError } from "../types.js";
-import { pick, ratioToPercent, toISODate, toNumber, windowFromCounts } from "../normalize.js";
-import { redact } from "../auth.js";
+} from "../types";
+import { AdapterError } from "../types";
+import { pick, ratioToPercent, toISODate, toNumber, windowFromCounts } from "../normalize";
+import { redact } from "../auth";
 
 const VERSION = "0.2.0";
 
@@ -71,11 +71,7 @@ function findLimitDetail(limits: unknown, durationMinutes: number): unknown {
   return undefined;
 }
 
-function ratioWindow(
-  kind: UsageWindow["kind"],
-  label: string,
-  value: unknown,
-): UsageWindow {
+function ratioWindow(kind: UsageWindow["kind"], label: string, value: unknown): UsageWindow {
   const ratio = toNumber(pick(value, "used_ratio", "usedRatio"));
   return {
     kind,

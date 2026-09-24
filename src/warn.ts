@@ -1,8 +1,8 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ProviderReport, UsageWindow } from "./types.js";
-import { pluginStateDir } from "./paths.js";
-import { formatReset } from "./render.js";
+import type { ProviderReport, UsageWindow } from "./types";
+import { pluginStateDir } from "./paths";
+import { formatReset } from "./render";
 
 export interface WarnHit {
   provider: string;
@@ -72,7 +72,8 @@ export async function checkWarnings(
     for (const w of report.windows) {
       const key = `${report.provider}/${w.kind}`;
       const crossed =
-        (w.usedPercent !== null && w.usedPercent >= thresholdPercent) || HITS_WINDOW_STATUSES.has(w.status);
+        (w.usedPercent !== null && w.usedPercent >= thresholdPercent) ||
+        HITS_WINDOW_STATUSES.has(w.status);
 
       if (crossed) {
         const prev = state[key];

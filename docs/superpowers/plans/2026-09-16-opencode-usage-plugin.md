@@ -24,24 +24,24 @@
 
 ## File Map
 
-| File | Responsibility | Task |
-|---|---|---|
-| `package.json`, `tsconfig.json`, `vitest.config.ts`, `.gitignore` | scaffold | 0 |
-| `src/types.ts` | shared types + `AdapterError` | 1 |
-| `src/normalize.ts` | tolerant parsing helpers | 1 |
-| `src/paths.ts` | data-home / auth / state-dir / db paths | 1 |
-| `src/auth.ts` | credential resolution + redaction | 1 |
-| `src/providers/kimi.ts` + `fixtures/kimi-*.json` | Kimi adapter | 2 |
-| `src/providers/opencode-go.ts` + `fixtures/go-*.json` | Go adapter | 3 |
-| `src/providers/index.ts` | adapter registry | 2 (owned) |
-| `src/cache.ts` | TTL disk cache, atomic writes, session id | 4 |
-| `src/fallback.ts` | local estimate from opencode.db | 4 |
-| `src/render.ts` | text table + JSON output | 5 |
-| `src/warn.ts` | threshold warnings, once-per-crossing | 5 |
-| `src/report.ts` | orchestration: adapter → cache → fallback → ProviderReport | 6 |
-| `src/index.ts` | plugin entry: tool, config hook (command), event hook | 6 |
-| `scripts/live-smoke.ts` | manual live check (`--yes-live` required) | 6 |
-| `README.md` | usage, options, extension guide | 6 |
+| File                                                              | Responsibility                                             | Task      |
+| ----------------------------------------------------------------- | ---------------------------------------------------------- | --------- |
+| `package.json`, `tsconfig.json`, `vitest.config.ts`, `.gitignore` | scaffold                                                   | 0         |
+| `src/types.ts`                                                    | shared types + `AdapterError`                              | 1         |
+| `src/normalize.ts`                                                | tolerant parsing helpers                                   | 1         |
+| `src/paths.ts`                                                    | data-home / auth / state-dir / db paths                    | 1         |
+| `src/auth.ts`                                                     | credential resolution + redaction                          | 1         |
+| `src/providers/kimi.ts` + `fixtures/kimi-*.json`                  | Kimi adapter                                               | 2         |
+| `src/providers/opencode-go.ts` + `fixtures/go-*.json`             | Go adapter                                                 | 3         |
+| `src/providers/index.ts`                                          | adapter registry                                           | 2 (owned) |
+| `src/cache.ts`                                                    | TTL disk cache, atomic writes, session id                  | 4         |
+| `src/fallback.ts`                                                 | local estimate from opencode.db                            | 4         |
+| `src/render.ts`                                                   | text table + JSON output                                   | 5         |
+| `src/warn.ts`                                                     | threshold warnings, once-per-crossing                      | 5         |
+| `src/report.ts`                                                   | orchestration: adapter → cache → fallback → ProviderReport | 6         |
+| `src/index.ts`                                                    | plugin entry: tool, config hook (command), event hook      | 6         |
+| `scripts/live-smoke.ts`                                           | manual live check (`--yes-live` required)                  | 6         |
+| `README.md`                                                       | usage, options, extension guide                            | 6         |
 
 ---
 
@@ -87,6 +87,7 @@
 ### Task 1: Foundation — types, normalize, paths, auth
 
 **Files:**
+
 - Create: `src/types.ts`, `src/normalize.ts`, `src/paths.ts`, `src/auth.ts`
 - Test: `test/normalize.test.ts`, `test/auth.test.ts`
 
@@ -99,12 +100,12 @@ export type WindowStatus = "ok" | "rate-limited" | "frozen" | "unknown";
 
 export interface UsageWindow {
   kind: WindowKind;
-  label: string;              // "5-hour", "Weekly", "Monthly"
+  label: string; // "5-hour", "Weekly", "Monthly"
   usedPercent: number | null; // 0-100
   used: number | null;
   limit: number | null;
   remaining: number | null;
-  resetsAt: string | null;    // ISO-8601
+  resetsAt: string | null; // ISO-8601
   status: WindowStatus;
 }
 
@@ -121,49 +122,70 @@ export interface ProviderReport {
   error: string | null;
 }
 
-export interface Credential { type: "api" | "oauth"; key: string }
-export interface AdapterResult { windows: UsageWindow[]; extras?: Record<string, string> }
-export interface FetchOptions { timeoutMs: number }
+export interface Credential {
+  type: "api" | "oauth";
+  key: string;
+}
+export interface AdapterResult {
+  windows: UsageWindow[];
+  extras?: Record<string, string>;
+}
+export interface FetchOptions {
+  timeoutMs: number;
+}
 export interface ProviderAdapter {
   id: string;
   displayName: string;
   fetch(cred: Credential, opts: FetchOptions): Promise<AdapterResult>;
 }
 export interface PluginOptions {
-  thresholdPercent: number;  // default 80
-  cacheTtlSeconds: number;   // default 120
+  thresholdPercent: number; // default 80
+  cacheTtlSeconds: number; // default 120
   providers: string[] | null; // null = all discovered
-  fallback: boolean;          // default true
+  fallback: boolean; // default true
 }
 
 export type AdapterErrorKind = "auth" | "no-plan" | "rate-limited" | "network" | "bad-response";
 export class AdapterError extends Error {
-  constructor(public kind: AdapterErrorKind, message: string) { super(message); this.name = "AdapterError"; }
+  constructor(
+    public kind: AdapterErrorKind,
+    message: string,
+  ) {
+    super(message);
+    this.name = "AdapterError";
+  }
 }
 ```
 
 ```ts
 // src/normalize.ts
-export function toNumber(v: unknown): number | null;      // accepts number | numeric string; else null
-export function toISODate(v: unknown): string | null;     // accepts ISO string | epoch seconds | epoch ms; validates via Date
+export function toNumber(v: unknown): number | null; // accepts number | numeric string; else null
+export function toISODate(v: unknown): string | null; // accepts ISO string | epoch seconds | epoch ms; validates via Date
 export function pick(obj: unknown, ...keys: string[]): unknown; // first non-null/undefined of obj[keys]; obj must be a plain object else undefined
-export function ratioToPercent(ratio: number): number;    // 0-1 -> 0-100, clamped [0,100], rounded to 1 decimal
-export function windowFromCounts(kind: WindowKind, label: string, detail: { limit?: unknown; used?: unknown; remaining?: unknown; reset?: unknown }): UsageWindow; // builds window with toNumber/toISODate, usedPercent = used/limit*100 when both known
+export function ratioToPercent(ratio: number): number; // 0-1 -> 0-100, clamped [0,100], rounded to 1 decimal
+export function windowFromCounts(
+  kind: WindowKind,
+  label: string,
+  detail: { limit?: unknown; used?: unknown; remaining?: unknown; reset?: unknown },
+): UsageWindow; // builds window with toNumber/toISODate, usedPercent = used/limit*100 when both known
 ```
 
 ```ts
 // src/paths.ts
-export function dataHome(env: NodeJS.ProcessEnv = process.env): string;      // $OPENCODE_DATA_HOME or ~/.local/share/opencode
-export function authPath(env?): string;                                      // <dataHome>/auth.json
-export function pluginStateDir(env?): string;                                // <dataHome>/usage-report
-export function dbPath(env?): string;                                        // <dataHome>/opencode.db
+export function dataHome(env: NodeJS.ProcessEnv = process.env): string; // $OPENCODE_DATA_HOME or ~/.local/share/opencode
+export function authPath(env?): string; // <dataHome>/auth.json
+export function pluginStateDir(env?): string; // <dataHome>/usage-report
+export function dbPath(env?): string; // <dataHome>/opencode.db
 ```
 
 ```ts
 // src/auth.ts
 import type { Credential } from "./types.js";
-export function envVarName(providerId: string): string;   // "kimi-for-coding" -> "OPENCODE_USAGE_KIMI_FOR_CODING_KEY"
-export function resolveCredential(providerId: string, opts?: { env?: NodeJS.ProcessEnv; dataHomeDir?: string }): Credential | null;
+export function envVarName(providerId: string): string; // "kimi-for-coding" -> "OPENCODE_USAGE_KIMI_FOR_CODING_KEY"
+export function resolveCredential(
+  providerId: string,
+  opts?: { env?: NodeJS.ProcessEnv; dataHomeDir?: string },
+): Credential | null;
 // order: (1) env override (empty string = missing), (2) auth.json entry { type:"api" -> .key, type:"oauth" -> .access }
 // malformed/missing auth.json -> null. Never throws.
 export function redact(text: string, key: string | null): string; // replaces all occurrences of key (len>=8) with "<redacted>"
@@ -209,7 +231,12 @@ describe("ratioToPercent", () => {
 });
 describe("windowFromCounts", () => {
   it("computes percent from string counts", () => {
-    const w = windowFromCounts("5h", "5-hour", { limit: "2900", used: "1218", remaining: "1682", reset: "2026-09-16T14:05:00Z" });
+    const w = windowFromCounts("5h", "5-hour", {
+      limit: "2900",
+      used: "1218",
+      remaining: "1682",
+      reset: "2026-09-16T14:05:00Z",
+    });
     expect(w.used).toBe(1218);
     expect(w.usedPercent).toBe(42);
     expect(w.resetsAt).toBe("2026-09-16T14:05:00.000Z");
@@ -237,14 +264,19 @@ describe("envVarName", () => {
   });
 });
 describe("resolveCredential", () => {
-  afterEach(() => { delete process.env.OPENCODE_USAGE_KIMI_FOR_CODING_KEY; });
+  afterEach(() => {
+    delete process.env.OPENCODE_USAGE_KIMI_FOR_CODING_KEY;
+  });
   it("prefers env override", () => {
     process.env.OPENCODE_USAGE_KIMI_FOR_CODING_KEY = "sk-env";
     expect(resolveCredential("kimi-for-coding")?.key).toBe("sk-env");
   });
   it("reads api key from auth.json", () => {
     const dir = mkdtempSync(join(tmpdir(), "auth-"));
-    writeFileSync(join(dir, "auth.json"), JSON.stringify({ "kimi-for-coding": { type: "api", key: "sk-file" } }));
+    writeFileSync(
+      join(dir, "auth.json"),
+      JSON.stringify({ "kimi-for-coding": { type: "api", key: "sk-file" } }),
+    );
     expect(resolveCredential("kimi-for-coding", { dataHomeDir: dir })?.key).toBe("sk-file");
   });
   it("reads oauth access token", () => {
@@ -263,7 +295,9 @@ describe("resolveCredential", () => {
 });
 describe("redact", () => {
   it("replaces key material", () => {
-    expect(redact("failed with sk-kimi-secret-123: unauthorized", "sk-kimi-secret-123")).toBe("failed with <redacted>: unauthorized");
+    expect(redact("failed with sk-kimi-secret-123: unauthorized", "sk-kimi-secret-123")).toBe(
+      "failed with <redacted>: unauthorized",
+    );
   });
   it("ignores short/null keys", () => {
     expect(redact("abc", "ab")).toBe("abc");
@@ -281,6 +315,7 @@ describe("redact", () => {
 ### Task 2: Kimi adapter
 
 **Files:**
+
 - Create: `src/providers/kimi.ts`, `src/providers/index.ts`
 - Create: `fixtures/kimi-canonical.json`, `fixtures/kimi-strings.json`, `fixtures/kimi-minimal.json`
 - Test: `test/kimi.test.ts`
@@ -294,12 +329,15 @@ import type { ProviderAdapter } from "../types.js";
 import { kimiAdapter } from "./kimi.js";
 import { opencodeGoAdapter } from "./opencode-go.js"; // NOTE: created in Task 3; if absent during Task 2, export registry with only kimi and let Task 3 add the import
 export const adapters: ProviderAdapter[] = [kimiAdapter, opencodeGoAdapter];
-export function getAdapter(id: string): ProviderAdapter | undefined { return adapters.find(a => a.id === id); }
+export function getAdapter(id: string): ProviderAdapter | undefined {
+  return adapters.find((a) => a.id === id);
+}
 ```
 
 **Endpoint:** `GET https://api.kimi.com/coding/v1/usages`, headers `{ Authorization: "Bearer " + cred.key, Accept: "application/json", "User-Agent": "opencode-usage-report/" + VERSION }` where `VERSION = "0.1.0"` (const at top of file). Timeout from `opts.timeoutMs` via `AbortSignal.timeout`. One retry on network error / 5xx; none on 4xx.
 
 **Parsing precedence (spec §3.3):**
+
 1. `usages.limit_5h` → `{ used_ratio, reset_time }` → window kind `"5h"`, label `"5-hour"`, `usedPercent = ratioToPercent(used_ratio)`, `resetsAt = toISODate(reset_time)`, absolutes null. Same for `usages.limit_7d` → kind `"weekly"`, label `"Weekly"`.
 2. If `usages.limit_5h` absent: scan `limits[]` for `window.duration == 300 && window.timeUnit == "TIME_UNIT_MINUTE"` → `windowFromCounts("5h", "5-hour", { limit: detail.limit, used: detail.used, remaining: detail.remaining, reset: pick(detail, "resetTime", "reset_time", "resetAt") })`.
 3. If `usages.limit_7d` absent: top-level `usage` → `windowFromCounts("weekly", "Weekly", ...)` with same reset pick.
@@ -310,12 +348,25 @@ export function getAdapter(id: string): ProviderAdapter | undefined { return ada
 **Fixtures (create with these exact shapes, synthetic values):**
 
 `fixtures/kimi-canonical.json`:
+
 ```json
 {
-  "usage": { "limit": "2900", "used": "1769", "remaining": "1131", "resetTime": "2026-09-22T00:00:00Z" },
+  "usage": {
+    "limit": "2900",
+    "used": "1769",
+    "remaining": "1131",
+    "resetTime": "2026-09-22T00:00:00Z"
+  },
   "limits": [
-    { "window": { "duration": 300, "timeUnit": "TIME_UNIT_MINUTE" },
-      "detail": { "limit": "2900", "used": "1218", "remaining": "1682", "resetTime": "2026-09-16T14:05:00Z" } }
+    {
+      "window": { "duration": 300, "timeUnit": "TIME_UNIT_MINUTE" },
+      "detail": {
+        "limit": "2900",
+        "used": "1218",
+        "remaining": "1682",
+        "resetTime": "2026-09-16T14:05:00Z"
+      }
+    }
   ],
   "usages": {
     "limit_5h": { "used_ratio": 0.42, "reset_time": "2026-09-16T14:05:00Z" },
@@ -325,6 +376,7 @@ export function getAdapter(id: string): ProviderAdapter | undefined { return ada
   "user": { "membership": { "level": "LEVEL_PRO" } }
 }
 ```
+
 `fixtures/kimi-strings.json`: canonical minus `usages` block (forces `limits[]`/top-level path), all counts strings, reset key spelled `resetAt`.
 `fixtures/kimi-minimal.json`: `{ "usage": { "limit": "100", "used": "0", "remaining": "100", "resetTime": "2026-09-22T00:00:00Z" } }` only.
 
@@ -340,9 +392,15 @@ import { AdapterError } from "../src/types.js";
 
 const cred = { type: "api" as const, key: "sk-test-key-123456" };
 const opts = { timeoutMs: 1000 };
-const fixture = (n: string) => JSON.parse(readFileSync(new URL(`../fixtures/${n}`, import.meta.url), "utf8"));
+const fixture = (n: string) =>
+  JSON.parse(readFileSync(new URL(`../fixtures/${n}`, import.meta.url), "utf8"));
 function mockFetch(status: number, body: unknown) {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(typeof body === "string" ? body : JSON.stringify(body), { status })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () => new Response(typeof body === "string" ? body : JSON.stringify(body), { status }),
+    ),
+  );
 }
 afterEach(() => vi.unstubAllGlobals());
 
@@ -350,9 +408,9 @@ describe("kimiAdapter", () => {
   it("parses canonical response preferring usages ratios", async () => {
     mockFetch(200, fixture("kimi-canonical.json"));
     const r = await kimiAdapter.fetch(cred, opts);
-    const fiveH = r.windows.find(w => w.kind === "5h")!;
+    const fiveH = r.windows.find((w) => w.kind === "5h")!;
     expect(fiveH.usedPercent).toBe(42);
-    const weekly = r.windows.find(w => w.kind === "weekly")!;
+    const weekly = r.windows.find((w) => w.kind === "weekly")!;
     expect(weekly.usedPercent).toBe(61);
     expect(r.extras?.["Plan"]).toBe("LEVEL_PRO");
     expect(r.extras?.["Booster wallet"]).toBe("3.21");
@@ -360,7 +418,7 @@ describe("kimiAdapter", () => {
   it("falls back to limits[] and top-level usage with string counts", async () => {
     mockFetch(200, fixture("kimi-strings.json"));
     const r = await kimiAdapter.fetch(cred, opts);
-    const fiveH = r.windows.find(w => w.kind === "5h")!;
+    const fiveH = r.windows.find((w) => w.kind === "5h")!;
     expect(fiveH.used).toBe(1218);
     expect(fiveH.usedPercent).toBe(42);
     expect(fiveH.resetsAt).toBe("2026-09-16T14:05:00.000Z");
@@ -372,10 +430,13 @@ describe("kimiAdapter", () => {
     expect(r.windows[0].kind).toBe("weekly");
   });
   it("marks monthly frozen when totalQuota.used > 0", async () => {
-    const body = { ...fixture("kimi-minimal.json"), totalQuota: { limit: "10", used: "3", remaining: "7" } };
+    const body = {
+      ...fixture("kimi-minimal.json"),
+      totalQuota: { limit: "10", used: "3", remaining: "7" },
+    };
     mockFetch(200, body);
     const r = await kimiAdapter.fetch(cred, opts);
-    expect(r.windows.find(w => w.kind === "monthly")?.status).toBe("frozen");
+    expect(r.windows.find((w) => w.kind === "monthly")?.status).toBe("frozen");
   });
   it("sends Authorization and User-Agent headers", async () => {
     mockFetch(200, fixture("kimi-minimal.json"));
@@ -406,6 +467,7 @@ describe("kimiAdapter", () => {
 ### Task 3: OpenCode Go adapter
 
 **Files:**
+
 - Create: `src/providers/opencode-go.ts`
 - Create: `fixtures/go-canonical.json`, `fixtures/go-minimal.json`
 - Modify: `src/providers/index.ts` (add import if Task 2 left it out — coordinate: whoever implements second ensures both adapters are registered)
@@ -424,12 +486,17 @@ describe("kimiAdapter", () => {
 **Fixtures:**
 
 `fixtures/go-canonical.json`:
+
 ```json
-{ "usage": {
-  "rolling": { "status": "ok", "percent": 12, "resetsAt": "2026-09-16T13:40:00Z" },
-  "weekly":  { "status": "ok", "percent": 57, "resetsAt": "2026-09-18T00:00:00Z" },
-  "monthly": { "status": "ok", "percent": 3,  "resetsAt": "2026-10-01T00:00:00Z" } } }
+{
+  "usage": {
+    "rolling": { "status": "ok", "percent": 12, "resetsAt": "2026-09-16T13:40:00Z" },
+    "weekly": { "status": "ok", "percent": 57, "resetsAt": "2026-09-18T00:00:00Z" },
+    "monthly": { "status": "ok", "percent": 3, "resetsAt": "2026-10-01T00:00:00Z" }
+  }
+}
 ```
+
 `fixtures/go-minimal.json`: `{ "usage": { "rolling": { "status": "ok", "percent": 0, "resetsAt": "2026-09-16T13:40:00Z" } } }`
 
 **Steps (TDD):**
@@ -443,9 +510,15 @@ import { opencodeGoAdapter } from "../src/providers/opencode-go.js";
 
 const cred = { type: "api" as const, key: "sk-go-key-123456" };
 const opts = { timeoutMs: 1000, sessionId: "sess-1" };
-const fixture = (n: string) => JSON.parse(readFileSync(new URL(`../fixtures/${n}`, import.meta.url), "utf8"));
+const fixture = (n: string) =>
+  JSON.parse(readFileSync(new URL(`../fixtures/${n}`, import.meta.url), "utf8"));
 function mockFetch(status: number, body: unknown) {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(typeof body === "string" ? body : JSON.stringify(body), { status })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () => new Response(typeof body === "string" ? body : JSON.stringify(body), { status }),
+    ),
+  );
 }
 afterEach(() => vi.unstubAllGlobals());
 
@@ -453,12 +526,16 @@ describe("opencodeGoAdapter", () => {
   it("parses canonical windows", async () => {
     mockFetch(200, fixture("go-canonical.json"));
     const r = await opencodeGoAdapter.fetch(cred, opts);
-    expect(r.windows.map(w => w.kind)).toEqual(["5h", "weekly", "monthly"]);
+    expect(r.windows.map((w) => w.kind)).toEqual(["5h", "weekly", "monthly"]);
     expect(r.windows[1].usedPercent).toBe(57);
     expect(r.windows[2].resetsAt).toBe("2026-10-01T00:00:00.000Z");
   });
   it("maps rate-limited status", async () => {
-    mockFetch(200, { usage: { rolling: { status: "rate-limited", percent: 100, resetsAt: "2026-09-16T13:40:00Z" } } });
+    mockFetch(200, {
+      usage: {
+        rolling: { status: "rate-limited", percent: 100, resetsAt: "2026-09-16T13:40:00Z" },
+      },
+    });
     const r = await opencodeGoAdapter.fetch(cred, opts);
     expect(r.windows[0].status).toBe("rate-limited");
   });
@@ -470,7 +547,10 @@ describe("opencodeGoAdapter", () => {
     expect(headers["x-opencode-session"]).toBe("sess-1");
   });
   it("maps 403 EntitlementError to no-plan", async () => {
-    mockFetch(403, { type: "error", error: { type: "EntitlementError", message: "OpenCode Go subscription required." } });
+    mockFetch(403, {
+      type: "error",
+      error: { type: "EntitlementError", message: "OpenCode Go subscription required." },
+    });
     await expect(opencodeGoAdapter.fetch(cred, opts)).rejects.toMatchObject({ kind: "no-plan" });
   });
   it("maps 401 to auth", async () => {
@@ -487,6 +567,7 @@ describe("opencodeGoAdapter", () => {
 ### Task 4: Cache + local fallback
 
 **Files:**
+
 - Create: `src/cache.ts`, `src/fallback.ts`
 - Test: `test/cache.test.ts`, `test/fallback.test.ts`
 
@@ -497,23 +578,37 @@ describe("opencodeGoAdapter", () => {
 ```ts
 // src/cache.ts
 import type { AdapterResult } from "./types.js";
-export interface CacheEntry { fetchedAt: string; result: AdapterResult }
-export async function readCache(providerId: string, ttlSeconds: number, env?: NodeJS.ProcessEnv): Promise<{ entry: CacheEntry; fresh: boolean } | null>;
-  // file <pluginStateDir>/cache-<providerId>.json; fresh = age <= ttl; corrupt/missing -> null
-export async function writeCache(providerId: string, result: AdapterResult, env?: NodeJS.ProcessEnv): Promise<void>;
-  // atomic: write tmp + rename; mkdir -p state dir
+export interface CacheEntry {
+  fetchedAt: string;
+  result: AdapterResult;
+}
+export async function readCache(
+  providerId: string,
+  ttlSeconds: number,
+  env?: NodeJS.ProcessEnv,
+): Promise<{ entry: CacheEntry; fresh: boolean } | null>;
+// file <pluginStateDir>/cache-<providerId>.json; fresh = age <= ttl; corrupt/missing -> null
+export async function writeCache(
+  providerId: string,
+  result: AdapterResult,
+  env?: NodeJS.ProcessEnv,
+): Promise<void>;
+// atomic: write tmp + rename; mkdir -p state dir
 export async function ensureSessionId(env?: NodeJS.ProcessEnv): Promise<string>;
-  // <pluginStateDir>/session-id; crypto.randomUUID() once, persisted
+// <pluginStateDir>/session-id; crypto.randomUUID() once, persisted
 ```
 
 ```ts
 // src/fallback.ts
 import type { AdapterResult } from "./types.js";
-export async function localEstimate(providerId: string, env?: NodeJS.ProcessEnv): Promise<AdapterResult | null>;
-  // opens dbPath(env) SQLite READ-ONLY (node:sqlite DatabaseSync with { readOnly: true } — Node 22.5+; if unavailable, dynamic import fails -> return null)
-  // introspect tables; expected: message/part tables with token counts & provider/model info
-  // aggregate per rolling 5h and weekly windows -> UsageWindow[] with absolutes only (usedPercent null), kind "5h"/"weekly", status "ok", resetsAt null
-  // ANY error (missing db, schema drift, no rows) -> null. Never throws.
+export async function localEstimate(
+  providerId: string,
+  env?: NodeJS.ProcessEnv,
+): Promise<AdapterResult | null>;
+// opens dbPath(env) SQLite READ-ONLY (node:sqlite DatabaseSync with { readOnly: true } — Node 22.5+; if unavailable, dynamic import fails -> return null)
+// introspect tables; expected: message/part tables with token counts & provider/model info
+// aggregate per rolling 5h and weekly windows -> UsageWindow[] with absolutes only (usedPercent null), kind "5h"/"weekly", status "ok", resetsAt null
+// ANY error (missing db, schema drift, no rows) -> null. Never throws.
 ```
 
 Note for implementer: inspect the real DB schema first with `sqlite3 ~/.local/share/opencode/opencode.db ".schema message"` and `.schema part` (read-only) and code defensively (`SELECT name FROM sqlite_master WHERE type='table'` guard). If token columns aren't found, aggregate message counts instead. All queries wrapped in try/catch → null.
@@ -530,7 +625,20 @@ import { join } from "node:path";
 import { readCache, writeCache, ensureSessionId } from "../src/cache.js";
 
 const env = (dir: string) => ({ OPENCODE_DATA_HOME: dir }) as unknown as NodeJS.ProcessEnv;
-const result = { windows: [{ kind: "5h", label: "5-hour", usedPercent: 10, used: null, limit: null, remaining: null, resetsAt: null, status: "ok" as const }] };
+const result = {
+  windows: [
+    {
+      kind: "5h",
+      label: "5-hour",
+      usedPercent: 10,
+      used: null,
+      limit: null,
+      remaining: null,
+      resetsAt: null,
+      status: "ok" as const,
+    },
+  ],
+};
 
 describe("cache", () => {
   it("round-trips fresh entries", async () => {
@@ -573,6 +681,7 @@ describe("cache", () => {
 ### Task 5: Render + warnings
 
 **Files:**
+
 - Create: `src/render.ts`, `src/warn.ts`
 - Test: `test/render.test.ts`, `test/warn.test.ts`
 
@@ -588,6 +697,7 @@ export function renderJson(reports: ProviderReport[]): string; // JSON.stringify
 ```
 
 Text format per provider (see spec §3.8):
+
 - Header: `DisplayName (source[, stale Xm old])`
 - Window line: two-space indent, kind label padded to 8, `NN% used` or `~` when local-estimate or `—` when percent null, optional `used / limit reqs`, `resets <relative-or-short-date>`.
 - Error: `⚠ DisplayName: error`.
@@ -596,8 +706,17 @@ Text format per provider (see spec §3.8):
 ```ts
 // src/warn.ts
 import type { ProviderReport, UsageWindow } from "./types.js";
-export interface WarnHit { provider: string; displayName: string; window: UsageWindow; message: string }
-export async function checkWarnings(reports: ProviderReport[], thresholdPercent: number, env?: NodeJS.ProcessEnv): Promise<WarnHit[]>;
+export interface WarnHit {
+  provider: string;
+  displayName: string;
+  window: UsageWindow;
+  message: string;
+}
+export async function checkWarnings(
+  reports: ProviderReport[],
+  thresholdPercent: number,
+  env?: NodeJS.ProcessEnv,
+): Promise<WarnHit[]>;
 // crossing: usedPercent >= threshold OR status in {"rate-limited","frozen"}
 // state file <pluginStateDir>/warn-state.json: { "<provider>/<kind>": { firedAtReset: string|null } }
 // fire only if not already fired for current resetsAt; re-arm when usedPercent < threshold - 10
@@ -617,11 +736,32 @@ import { checkWarnings } from "../src/warn.js";
 import type { ProviderReport } from "../src/types.js";
 
 const env = (d: string) => ({ OPENCODE_DATA_HOME: d }) as unknown as NodeJS.ProcessEnv;
-const report = (pct: number, resetsAt: string | null = "2026-09-16T14:05:00Z"): ProviderReport[] => [{
-  provider: "p", displayName: "P", fetchedAt: "2026-09-16T12:00:00Z", source: "api", stale: false,
-  windows: [{ kind: "5h", label: "5-hour", usedPercent: pct, used: null, limit: null, remaining: null, resetsAt, status: "ok" }],
-  extras: {}, error: null,
-}];
+const report = (
+  pct: number,
+  resetsAt: string | null = "2026-09-16T14:05:00Z",
+): ProviderReport[] => [
+  {
+    provider: "p",
+    displayName: "P",
+    fetchedAt: "2026-09-16T12:00:00Z",
+    source: "api",
+    stale: false,
+    windows: [
+      {
+        kind: "5h",
+        label: "5-hour",
+        usedPercent: pct,
+        used: null,
+        limit: null,
+        remaining: null,
+        resetsAt,
+        status: "ok",
+      },
+    ],
+    extras: {},
+    error: null,
+  },
+];
 
 describe("checkWarnings", () => {
   it("fires once per crossing until reset", async () => {
@@ -652,10 +792,25 @@ import { renderText, renderJson } from "../src/render.js";
 import type { ProviderReport } from "../src/types.js";
 
 const base: ProviderReport = {
-  provider: "kimi-for-coding", displayName: "Kimi Code", fetchedAt: new Date(Date.now() - 5 * 60000).toISOString(),
-  source: "api", stale: false,
-  windows: [{ kind: "5h", label: "5-hour", usedPercent: 42, used: 1218, limit: 2900, remaining: 1682, resetsAt: "2026-09-16T14:05:00Z", status: "ok" }],
-  extras: { "Booster wallet": "3.21" }, error: null,
+  provider: "kimi-for-coding",
+  displayName: "Kimi Code",
+  fetchedAt: new Date(Date.now() - 5 * 60000).toISOString(),
+  source: "api",
+  stale: false,
+  windows: [
+    {
+      kind: "5h",
+      label: "5-hour",
+      usedPercent: 42,
+      used: 1218,
+      limit: 2900,
+      remaining: 1682,
+      resetsAt: "2026-09-16T14:05:00Z",
+      status: "ok",
+    },
+  ],
+  extras: { "Booster wallet": "3.21" },
+  error: null,
 };
 
 describe("renderText", () => {
@@ -673,7 +828,9 @@ describe("renderText", () => {
     expect(est).toContain("~");
   });
   it("renders errors", () => {
-    const out = renderText([{ ...base, source: "error", error: "no credential found", windows: [] }]);
+    const out = renderText([
+      { ...base, source: "error", error: "no credential found", windows: [] },
+    ]);
     expect(out).toContain("⚠ Kimi Code: no credential found");
   });
 });
@@ -691,6 +848,7 @@ describe("renderJson", () => {
 ### Task 6: Orchestration + plugin wiring + smoke + README (after 1–5 merge)
 
 **Files:**
+
 - Create: `src/report.ts`, `src/index.ts`, `scripts/live-smoke.ts`, `README.md`
 - Test: `test/report.test.ts`
 
@@ -701,11 +859,22 @@ describe("renderJson", () => {
 ```ts
 // src/report.ts
 import type { ProviderReport, PluginOptions } from "./types.js";
-export const DEFAULT_OPTIONS: PluginOptions = { thresholdPercent: 80, cacheTtlSeconds: 120, providers: null, fallback: true };
-export async function collectReports(opts: { providers?: string[]; refresh?: boolean; options?: Partial<PluginOptions>; env?: NodeJS.ProcessEnv }): Promise<ProviderReport[]>;
+export const DEFAULT_OPTIONS: PluginOptions = {
+  thresholdPercent: 80,
+  cacheTtlSeconds: 120,
+  providers: null,
+  fallback: true,
+};
+export async function collectReports(opts: {
+  providers?: string[];
+  refresh?: boolean;
+  options?: Partial<PluginOptions>;
+  env?: NodeJS.ProcessEnv;
+}): Promise<ProviderReport[]>;
 ```
 
 Per adapter (filtered by `opts.providers` / `options.providers`; unknown id → error report `"unknown provider '<id>' (known: kimi-for-coding, opencode-go)"`):
+
 1. `resolveCredential` → null → error report "no credential found".
 2. If `!refresh`: `readCache` fresh → report `source: "cache"`.
 3. `adapter.fetch(cred, { timeoutMs: 5000, sessionId: await ensureSessionId() })` → success → `writeCache`, report `source: "api"`.
@@ -724,14 +893,19 @@ const plugin: Plugin = async ({ client }, options) => {
   return {
     tool: {
       usage_report: {
-        description: "Show subscription usage/quota windows (5h, weekly, monthly) for configured inference providers (kimi-for-coding, opencode-go)",
+        description:
+          "Show subscription usage/quota windows (5h, weekly, monthly) for configured inference providers (kimi-for-coding, opencode-go)",
         args: {
           provider: { type: "string", description: "optional provider id filter", optional: true },
           json: { type: "boolean", description: "emit JSON", optional: true },
           refresh: { type: "boolean", description: "bypass cache", optional: true },
         },
         async execute(args: { provider?: string; json?: boolean; refresh?: boolean }) {
-          const reports = await collectReports({ providers: args.provider ? [args.provider] : undefined, refresh: args.refresh, options: opts });
+          const reports = await collectReports({
+            providers: args.provider ? [args.provider] : undefined,
+            refresh: args.refresh,
+            options: opts,
+          });
           return args.json ? renderJson(reports) : renderText(reports);
         },
       },
@@ -740,7 +914,8 @@ const plugin: Plugin = async ({ client }, options) => {
       cfg.command ??= {};
       cfg.command.usage ??= {
         description: "Show subscription usage/quota windows for configured providers",
-        template: "Call the usage_report tool with these arguments: $ARGUMENTS and present the result verbatim.",
+        template:
+          "Call the usage_report tool with these arguments: $ARGUMENTS and present the result verbatim.",
       };
     },
     async event({ event }) {
@@ -751,9 +926,15 @@ const plugin: Plugin = async ({ client }, options) => {
         const reports = await collectReports({ options: opts });
         const hits = await checkWarnings(reports, opts.thresholdPercent);
         for (const hit of hits) {
-          await client.tui.showToast({ body: { title: "Usage warning", message: hit.message, variant: "warning" } }).catch(() => {});
+          await client.tui
+            .showToast({
+              body: { title: "Usage warning", message: hit.message, variant: "warning" },
+            })
+            .catch(() => {});
         }
-      } catch { /* never throw into the event bus */ }
+      } catch {
+        /* never throw into the event bus */
+      }
     },
   };
 };
@@ -769,6 +950,7 @@ Note for implementer: verify the exact `tool` registration shape and `client.tui
 **README.md sections:** What it does; install (`plugin: ["./path/or/npm-spec"]` in opencode.json, restart opencode); `/usage`, `/usage kimi`, `/usage --json`, `/usage --refresh`; options table; how warnings work; data sources & privacy note (keys never logged); extending (new adapter recipe with Gemini/Claude pointers from spec §8); development (`npm test`, `npm run typecheck`, `npm run smoke -- --yes-live`).
 
 **Steps:**
+
 - [ ] **Step 1:** failing `test/report.test.ts`. **Step 2:** run → FAIL. **Step 3:** implement report.ts. **Step 4:** PASS.
 - [ ] **Step 5:** implement index.ts + smoke + README.
 - [ ] **Step 6:** full `npx vitest run` PASS + `npx tsc --noEmit` clean.

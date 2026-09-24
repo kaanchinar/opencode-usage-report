@@ -6,16 +6,9 @@ import type {
   TuiSlotPlugin,
 } from "@opencode-ai/plugin/tui";
 import { For, createSignal } from "solid-js";
-import { DEFAULT_OPTIONS, collectReports } from "./report.js";
-import {
-  bar,
-  coerceTuiOptions,
-  countdown,
-  percentText,
-  toneFor,
-  windowLabel,
-} from "./tui-format.js";
-import type { ProviderReport, WindowKind } from "./types.js";
+import { DEFAULT_OPTIONS, collectReports } from "./report";
+import { bar, coerceTuiOptions, countdown, percentText, toneFor, windowLabel } from "./tui-format";
+import type { ProviderReport, WindowKind } from "./types";
 
 type Theme = TuiPluginApi["theme"]["current"];
 type ThemeColor = Theme["text"];
@@ -55,8 +48,7 @@ function clip(value: string, max = 60): string {
 
 /** Pads a label to a fixed width, truncating (with a trailing space) when long. */
 function alignLabel(label: string): string {
-  const text =
-    label.length > NAMED_WIDTH ? label.slice(0, NAMED_WIDTH - 1) + " " : label;
+  const text = label.length > NAMED_WIDTH ? label.slice(0, NAMED_WIDTH - 1) + " " : label;
   return text.padEnd(NAMED_WIDTH);
 }
 
@@ -94,16 +86,12 @@ function buildLines(
 
     if (report.source === "error") {
       lines.push({
-        segments: [
-          { text: clip(report.error ?? "unknown error"), fg: theme.error },
-        ],
+        segments: [{ text: clip(report.error ?? "unknown error"), fg: theme.error }],
       });
       continue;
     }
 
-    const windows = [...report.windows].sort(
-      (a, b) => windowRank(a.kind) - windowRank(b.kind),
-    );
+    const windows = report.windows.toSorted((a, b) => windowRank(a.kind) - windowRank(b.kind));
     for (const w of windows) {
       const tone = toneFor(w.usedPercent, w.status);
       const row: Segment[] = [
@@ -121,9 +109,7 @@ function buildLines(
 
     for (const [key, value] of Object.entries(report.extras)) {
       lines.push({
-        segments: [
-          { text: clip(`${key}: ${value}`, EXTRAS_MAX_LENGTH), fg: theme.textMuted },
-        ],
+        segments: [{ text: clip(`${key}: ${value}`, EXTRAS_MAX_LENGTH), fg: theme.textMuted }],
       });
     }
   }
@@ -198,9 +184,7 @@ export const tui: TuiPlugin = async (api, rawOptions) => {
           },
         },
       ],
-      bindings: [
-        { key: "ctrl+shift+u", cmd: "usage.refresh", desc: "Refresh usage panel" },
-      ],
+      bindings: [{ key: "ctrl+shift+u", cmd: "usage.refresh", desc: "Refresh usage panel" }],
     }),
   );
 
@@ -215,7 +199,14 @@ export const tui: TuiPlugin = async (api, rawOptions) => {
               <b>Usage</b>
             </text>
             <For
-              each={buildLines(theme, reports(), busy(), error(), new Date(tick()), options.barWidth)}
+              each={buildLines(
+                theme,
+                reports(),
+                busy(),
+                error(),
+                new Date(tick()),
+                options.barWidth,
+              )}
             >
               {(line) => (
                 <text>

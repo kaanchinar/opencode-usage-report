@@ -2,15 +2,36 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkWarnings } from "../src/warn.js";
-import type { ProviderReport } from "../src/types.js";
+import { checkWarnings } from "@/warn";
+import type { ProviderReport } from "@/types";
 
 const env = (d: string) => ({ OPENCODE_DATA_HOME: d }) as unknown as NodeJS.ProcessEnv;
-const report = (pct: number, resetsAt: string | null = "2026-09-16T14:05:00Z"): ProviderReport[] => [{
-  provider: "p", displayName: "P", fetchedAt: "2026-09-16T12:00:00Z", source: "api", stale: false,
-  windows: [{ kind: "5h", label: "5-hour", usedPercent: pct, used: null, limit: null, remaining: null, resetsAt, status: "ok" }],
-  extras: {}, error: null,
-}];
+const report = (
+  pct: number,
+  resetsAt: string | null = "2026-09-16T14:05:00Z",
+): ProviderReport[] => [
+  {
+    provider: "p",
+    displayName: "P",
+    fetchedAt: "2026-09-16T12:00:00Z",
+    source: "api",
+    stale: false,
+    windows: [
+      {
+        kind: "5h",
+        label: "5-hour",
+        usedPercent: pct,
+        used: null,
+        limit: null,
+        remaining: null,
+        resetsAt,
+        status: "ok",
+      },
+    ],
+    extras: {},
+    error: null,
+  },
+];
 
 describe("checkWarnings", () => {
   it("fires once per crossing until reset", async () => {

@@ -1,0 +1,37 @@
+{
+  "usage": {
+    "limit": "2900",
+    "used": "1769",
+    "remaining": "1131",
+    "resetTime": "2026-09-22T00:00:00Z"
+  },
+  "limits": [
+    {
+      "window": { "duration": 300, "timeUnit": "TIME_UNIT_MINUTE" },
+      "detail": {
+        "limit": "2900",
+        "used": "1218",
+        "remaining": "1682",
+        "resetTime": "2026-09-16T14:05:00Z"
+      }
+    }
+  ],
+  "usages": {
+    "limit_5h": { "used_ratio": 0.42, "reset_time": "2026-09-16T14:05:00Z" },
+    "limit_7d": { "used_ratio": 0.61, "reset_time": "2026-09-22T00:00:00Z" }
+  },
+  "booster_wallet": {
+    "balance": {
+      "id": "wal_123",
+      "feature": "FEATURE_OMNI",
+      "type": "BOOSTER",
+      "unit": "UNIT_CURRENCY",
+      "periodStart": "2026-09-01T00:00:00Z",
+      "periodEnd": "2026-10-01T00:00:00Z"
+    },
+    "status": "STATUS_ACTIVE",
+    "monthlyUsed": { "currency": "USD", "priceInCents": "123" },
+    "topupLimit": { "currency": "USD", "priceInCents": "5000" }
+  },
+  "user": { "membership": { "level": "LEVEL_PRO" } }
+}

@@ -1,9 +1,9 @@
-import type { PluginOptions, ProviderAdapter, ProviderReport } from "./types.js";
-import { adapters, getAdapter } from "./providers/index.js";
-import { redact, resolveCredential } from "./auth.js";
-import { ensureSessionId, readCache, writeCache } from "./cache.js";
-import type { CacheEntry } from "./cache.js";
-import { localEstimate } from "./fallback.js";
+import type { PluginOptions, ProviderAdapter, ProviderReport } from "./types";
+import { adapters, getAdapter } from "./providers/index";
+import { redact, resolveCredential } from "./auth";
+import { ensureSessionId, readCache, writeCache } from "./cache";
+import type { CacheEntry } from "./cache";
+import { localEstimate } from "./fallback";
 
 export const DEFAULT_OPTIONS: PluginOptions = {
   thresholdPercent: 80,
@@ -102,7 +102,10 @@ async function collectOne(
       error: null,
     };
   } catch (err) {
-    failure = redact(err instanceof Error ? err.message : String(err), cred.key);
+    failure = redact(
+      redact(err instanceof Error ? err.message : String(err), cred.key),
+      cred.accountId ?? null,
+    );
   }
 
   const cached = await readCache(id, options.cacheTtlSeconds, env);
@@ -136,7 +139,7 @@ async function collectOne(
  * `source: "error"` rows.
  */
 export async function collectReports(opts: CollectReportsOptions = {}): Promise<ProviderReport[]> {
-  const options: PluginOptions = { ...DEFAULT_OPTIONS, ...(opts.options ?? {}) };
+  const options: PluginOptions = { ...DEFAULT_OPTIONS, ...opts.options };
   const env = opts.env ?? process.env;
   const refresh = opts.refresh === true;
 

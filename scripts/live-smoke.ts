@@ -7,8 +7,8 @@
  * Key material is never printed: reports carry only adapter-sanitized messages.
  */
 import process from "node:process";
-import { collectReports } from "../src/report.js";
-import { renderText } from "../src/render.js";
+import { collectReports } from "@/report";
+import { renderText } from "@/render";
 
 async function main(): Promise<void> {
   if (!process.argv.includes("--yes-live")) {
@@ -25,7 +25,9 @@ async function main(): Promise<void> {
 
   const failed = reports.filter((report) => report.source === "error");
   if (failed.length > 0) {
-    console.error(`\n${failed.length} provider(s) failed: ${failed.map((r) => r.provider).join(", ")}`);
+    console.error(
+      `\n${failed.length} provider(s) failed: ${failed.map((r) => r.provider).join(", ")}`,
+    );
     process.exitCode = 1;
   }
 }

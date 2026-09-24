@@ -8,8 +8,8 @@ const KEY = "sk-test-SECRET-key-123456";
 
 // Registry + fallback are mocked so the test is fully offline and deterministic.
 const h = vi.hoisted(() => {
-  const fetchMock = vi.fn();
-  const localEstimateMock = vi.fn();
+  const fetchMock = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+  const localEstimateMock = vi.fn<(...args: unknown[]) => Promise<unknown>>();
   const adapters = [
     { id: "kimi-code-plan-global", displayName: "Kimi Code (kimi.ai)", fetch: fetchMock },
     { id: "opencode-go", displayName: "OpenCode Go", fetch: fetchMock },
@@ -17,17 +17,17 @@ const h = vi.hoisted(() => {
   return { fetchMock, localEstimateMock, adapters };
 });
 
-vi.mock("../src/providers/index.js", () => ({
+vi.mock("@/providers/index", () => ({
   adapters: h.adapters,
   getAdapter: (id: string) => h.adapters.find((a) => a.id === id),
 }));
-vi.mock("../src/fallback.js", () => ({ localEstimate: h.localEstimateMock }));
+vi.mock("@/fallback", () => ({ localEstimate: h.localEstimateMock }));
 
-import { collectReports } from "../src/report.js";
-import { renderJson, renderText } from "../src/render.js";
-import { checkWarnings } from "../src/warn.js";
-import { AdapterError } from "../src/types.js";
-import type { AdapterResult, ProviderReport } from "../src/types.js";
+import { collectReports } from "@/report";
+import { renderJson, renderText } from "@/render";
+import { checkWarnings } from "@/warn";
+import { AdapterError } from "@/types";
+import type { AdapterResult, ProviderReport } from "@/types";
 
 const dataEnv = (dir: string): NodeJS.ProcessEnv =>
   ({

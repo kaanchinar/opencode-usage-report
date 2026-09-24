@@ -10,6 +10,7 @@ The user is tired of manually checking usage limits for each inference subscript
 ## 2. Scope
 
 **In scope (v1):**
+
 - Providers: `kimi-for-coding`, `opencode-go` (exactly these two adapters; architecture must make adding more trivial).
 - `/usage` command output in chat, with `--json`, `--refresh`, and per-provider filter args.
 - Background low-quota warnings (default threshold: any window ≥ 80% used).
@@ -17,6 +18,7 @@ The user is tired of manually checking usage limits for each inference subscript
 - Publishable npm package layout; locally loadable via path in `opencode.jsonc` during development.
 
 **Out of scope (v1):**
+
 - TUI plugin (`tui.json`) integration, status-line widgets.
 - Gemini/Claude/Codex/Copilot adapters (documented as extension points only).
 - Historical usage graphs, cost analytics.
@@ -52,24 +54,24 @@ type WindowKind = "5h" | "daily" | "weekly" | "monthly" | "other";
 
 interface UsageWindow {
   kind: WindowKind;
-  label: string;            // e.g. "5-hour", "Weekly"
-  usedPercent: number | null;   // 0–100; null when only absolutes are known
-  used: number | null;      // absolute units (requests/tokens) when known
+  label: string; // e.g. "5-hour", "Weekly"
+  usedPercent: number | null; // 0–100; null when only absolutes are known
+  used: number | null; // absolute units (requests/tokens) when known
   limit: number | null;
   remaining: number | null;
-  resetsAt: string | null;  // ISO-8601
+  resetsAt: string | null; // ISO-8601
   status: "ok" | "rate-limited" | "frozen" | "unknown";
 }
 
 interface ProviderReport {
-  provider: string;         // "kimi-for-coding"
-  displayName: string;      // "Kimi Code"
-  fetchedAt: string;        // ISO
+  provider: string; // "kimi-for-coding"
+  displayName: string; // "Kimi Code"
+  fetchedAt: string; // ISO
   source: "api" | "cache" | "local-estimate" | "error";
-  stale: boolean;           // true when served from expired cache or fallback
+  stale: boolean; // true when served from expired cache or fallback
   windows: UsageWindow[];
-  extras: Record<string, string>;  // e.g. { "Booster wallet": "$3.21" }
-  error: string | null;     // human-readable, sanitized (never contains keys)
+  extras: Record<string, string>; // e.g. { "Booster wallet": "$3.21" }
+  error: string | null; // human-readable, sanitized (never contains keys)
 }
 
 interface AdapterResult {
@@ -78,7 +80,7 @@ interface AdapterResult {
 }
 
 interface ProviderAdapter {
-  id: string;                       // matches auth.json key
+  id: string; // matches auth.json key
   displayName: string;
   fetch(cred: Credential, opts: { timeoutMs: number }): Promise<AdapterResult>;
   // cache/fallback orchestration lives outside adapters
@@ -88,6 +90,7 @@ interface ProviderAdapter {
 ### 3.2 Auth resolution (`src/auth.ts`)
 
 Order per provider:
+
 1. Env override: `OPENCODE_USAGE_<NORMALIZED_ID>_KEY` (e.g. `OPENCODE_USAGE_KIMI_FOR_CODING_KEY` — non-alphanumerics → `_`, uppercased).
 2. `~/.local/share/opencode/auth.json` → entry keyed by provider id; accept `type: "api"` (`.key`) and `type: "oauth"` (`.access`) — defensive, oauth not needed today.
 3. Missing → report `{ source: "error", error: "no credential found" }` for that provider only.
@@ -97,6 +100,7 @@ Path resolution honors `$OPENCODE_DATA_HOME` if set, else `~/.local/share/openco
 ### 3.3 Provider adapters
 
 **Kimi Code (`src/providers/kimi.ts`)**
+
 - `GET https://api.kimi.com/coding/v1/usages`, headers: `Authorization: Bearer <key>`, `Accept: application/json`. Custom `User-Agent: opencode-usage-report/<version>`.
 - Parse precedence:
   1. `usages.limit_5h` / `usages.limit_7d` → `{ used_ratio (0–1 number), reset_time }` → usedPercent = ratio×100.
@@ -109,6 +113,7 @@ Path resolution honors `$OPENCODE_DATA_HOME` if set, else `~/.local/share/openco
 - Tolerate: numbers as strings or ints; `resetTime` | `reset_time` | `resetAt`; missing blocks; unknown fields ignored.
 
 **OpenCode Go (`src/providers/opencode-go.ts`)**
+
 - `GET https://opencode.ai/zen/go/v1/usage`, headers: `Authorization: Bearer <key>`, `Accept: application/json`, **custom `User-Agent: opencode-usage-report/<version>`** (Cloudflare 1010-blocks default Node/Bun UAs), `x-opencode-session: <stable per-install UUID>` (generated once, persisted in cache dir).
 - Parse `usage.rolling` → 5h, `usage.weekly` → weekly, `usage.monthly` → monthly. Each: `{ status, percent (used, 0–100), resetsAt }`.
 - Error mapping: 401 → "invalid API key"; 403 (`EntitlementError`) → "OpenCode Go subscription not active on this key"; 429 → rate-limited, use cache/fallback; network/5xx → cache/fallback.

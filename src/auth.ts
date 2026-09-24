@@ -1,12 +1,21 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Credential } from "./types.js";
-import { dataHome } from "./paths.js";
+import type { Credential } from "./types";
+import { dataHome } from "./paths";
 
 /** "kimi-code-plan-global" -> "OPENCODE_USAGE_KIMI_CODE_PLAN_GLOBAL_KEY" (non-alphanumerics become "_", uppercased). */
 export function envVarName(providerId: string): string {
+  return providerEnvVarName(providerId, "KEY");
+}
+
+/** "openai" -> "OPENCODE_USAGE_OPENAI_ACCOUNT_ID" (same normalization as envVarName). */
+export function accountIdEnvVarName(providerId: string): string {
+  return providerEnvVarName(providerId, "ACCOUNT_ID");
+}
+
+function providerEnvVarName(providerId: string, suffix: string): string {
   const normalized = providerId.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase();
-  return `OPENCODE_USAGE_${normalized}_KEY`;
+  return `OPENCODE_USAGE_${normalized}_${suffix}`;
 }
 
 /**
@@ -23,7 +32,10 @@ export function resolveCredential(
 
     const override = env[envVarName(providerId)];
     if (typeof override === "string" && override.trim() !== "") {
-      return { type: "api", key: override };
+      const accountId = env[accountIdEnvVarName(providerId)];
+      return typeof accountId === "string" && accountId.trim() !== ""
+        ? { type: "api", key: override, accountId }
+        : { type: "api", key: override };
     }
 
     const dir = opts.dataHomeDir ?? dataHome(env);
@@ -40,10 +52,21 @@ export function resolveCredential(
       return typeof key === "string" && key !== "" ? { type: "api", key } : null;
     }
     if (record.type === "oauth") {
+      // Prefer the access token. opencode stores the GitHub Copilot token in
+      // `refresh` (there is no access token), so fall back to it there only;
+      // other oauth providers keep the access-only behavior.
       const access = record.access;
-      return typeof access === "string" && access !== ""
-        ? { type: "oauth", key: access }
-        : null;
+      let key = typeof access === "string" && access !== "" ? access : null;
+      if (key === null && providerId === "github-copilot") {
+        const refresh = record.refresh;
+        if (typeof refresh === "string" && refresh !== "") key = refresh;
+      }
+      if (key === null) return null;
+
+      const accountId = record.accountId;
+      return typeof accountId === "string" && accountId !== ""
+        ? { type: "oauth", key, accountId }
+        : { type: "oauth", key };
     }
     return null;
   } catch {

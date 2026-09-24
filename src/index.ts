@@ -1,11 +1,11 @@
 import type { Plugin } from "@opencode-ai/plugin";
 import { tool } from "@opencode-ai/plugin";
-import { DEFAULT_OPTIONS, collectReports } from "./report.js";
-import { renderJson, renderText } from "./render.js";
-import { checkWarnings } from "./warn.js";
-import { toNumber } from "./normalize.js";
-import { adapters } from "./providers/index.js";
-import type { PluginOptions } from "./types.js";
+import { DEFAULT_OPTIONS, collectReports } from "./report";
+import { renderJson, renderText } from "./render";
+import { checkWarnings } from "./warn";
+import { toNumber } from "./normalize";
+import { adapters } from "./providers/index";
+import type { PluginOptions } from "./types";
 
 const WARN_THROTTLE_MS = 10 * 60 * 1000;
 

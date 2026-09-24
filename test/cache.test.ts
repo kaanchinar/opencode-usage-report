@@ -1,12 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readCache, writeCache, ensureSessionId } from "../src/cache.js";
-import type { AdapterResult } from "../src/types.js";
+import { readCache, writeCache, ensureSessionId } from "@/cache";
+import type { AdapterResult } from "@/types";
 
 const env = (dir: string) => ({ OPENCODE_DATA_HOME: dir }) as unknown as NodeJS.ProcessEnv;
-const result: AdapterResult = { windows: [{ kind: "5h", label: "5-hour", usedPercent: 10, used: null, limit: null, remaining: null, resetsAt: null, status: "ok" }] };
+const result: AdapterResult = {
+  windows: [
+    {
+      kind: "5h",
+      label: "5-hour",
+      usedPercent: 10,
+      used: null,
+      limit: null,
+      remaining: null,
+      resetsAt: null,
+      status: "ok",
+    },
+  ],
+};
 
 describe("cache", () => {
   it("round-trips fresh entries", async () => {

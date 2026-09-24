@@ -6,10 +6,10 @@ import type {
   UsageWindow,
   WindowKind,
   WindowStatus,
-} from "../types.js";
-import { AdapterError } from "../types.js";
-import { toISODate, toNumber } from "../normalize.js";
-import { redact } from "../auth.js";
+} from "../types";
+import { AdapterError } from "../types";
+import { toISODate, toNumber } from "../normalize";
+import { redact } from "../auth";
 
 const VERSION = "0.2.0";
 const USER_AGENT = "opencode-usage-report/" + VERSION;
@@ -139,7 +139,10 @@ export const opencodeGoAdapter: ProviderAdapter = {
     const body = asRecord(json);
     const usage = body ? asRecord(body.usage) : null;
     if (!usage) {
-      throw new AdapterError("bad-response", redact("OpenCode Go response missing usage", cred.key));
+      throw new AdapterError(
+        "bad-response",
+        redact("OpenCode Go response missing usage", cred.key),
+      );
     }
 
     const windows: UsageWindow[] = [];
