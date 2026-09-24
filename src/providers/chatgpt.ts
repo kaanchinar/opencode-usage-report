@@ -10,7 +10,7 @@ import { AdapterError } from "../types";
 import { toISODate, toNumber } from "../normalize";
 import { redact } from "../auth";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const USER_AGENT = "opencode-usage-report/" + VERSION;
 const ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
 

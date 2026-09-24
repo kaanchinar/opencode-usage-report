@@ -9,7 +9,7 @@ import { AdapterError } from "../types";
 import { pick, ratioToPercent, toISODate, toNumber, windowFromCounts } from "../normalize";
 import { redact } from "../auth";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 /**
  * Kimi Code is split by region in opencode/models.dev: the global plan lives on

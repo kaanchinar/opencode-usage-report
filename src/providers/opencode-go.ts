@@ -11,7 +11,7 @@ import { AdapterError } from "../types";
 import { toISODate, toNumber } from "../normalize";
 import { redact } from "../auth";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const USER_AGENT = "opencode-usage-report/" + VERSION;
 const ENDPOINT = "https://opencode.ai/zen/go/v1/usage";
 
