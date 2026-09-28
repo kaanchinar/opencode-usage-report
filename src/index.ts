@@ -5,6 +5,8 @@ import { renderJson, renderText } from "./render";
 import { checkWarnings } from "./warn";
 import { toNumber } from "./normalize";
 import { adapters } from "./providers/index";
+import { estimateTokens } from "./context/estimate";
+import { writeCapture } from "./context/system";
 import type { PluginOptions } from "./types";
 
 const WARN_THROTTLE_MS = 10 * 60 * 1000;
@@ -12,9 +14,6 @@ const WARN_THROTTLE_MS = 10 * 60 * 1000;
 const TOOL_DESCRIPTION =
   "Show subscription usage/quota windows (5h, weekly, monthly) for configured inference providers " +
   `(${adapters.map((adapter) => adapter.id).join(", ")})`;
-
-const COMMAND_TEMPLATE =
-  "Call the usage_report tool with these arguments: $ARGUMENTS and present the result verbatim.";
 
 /** Merges user plugin options over defaults, defensively ignoring malformed values. */
 export function coerceOptions(raw: Record<string, unknown> | undefined): PluginOptions {
@@ -91,12 +90,31 @@ const plugin: Plugin = async ({ client }, options) => {
       }),
     },
 
-    async config(cfg) {
-      cfg.command ??= {};
-      cfg.command.usage ??= {
-        description: "Show subscription usage/quota windows for configured providers",
-        template: COMMAND_TEMPLATE,
-      };
+    // `/usage` is owned by the TUI plugin so the slash command opens a local
+    // dialog instead of routing through the model. This hook's only job is to
+    // measure the assembled system prompt, which opencode never persists, so
+    // the TUI can split the "System & tools" residual (spec §9.1).
+    async "experimental.chat.system.transform"(input, output) {
+      try {
+        const sessionID = input?.sessionID;
+        if (typeof sessionID !== "string" || sessionID === "") return;
+        const model = input?.model;
+        if (model === undefined) return;
+        const system = Array.isArray(output?.system) ? output.system.join("\n") : "";
+        if (system === "") return;
+
+        await writeCapture({
+          version: 1,
+          sessionID,
+          providerID: model.providerID,
+          modelID: model.id,
+          systemChars: system.length,
+          systemTokens: estimateTokens(system),
+          capturedAt: Date.now(),
+        });
+      } catch {
+        // Best-effort: an experimental hook must never be able to break a request.
+      }
     },
 
     async event({ event }) {

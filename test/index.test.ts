@@ -6,6 +6,7 @@ import type { Hooks, PluginInput } from "@opencode-ai/plugin";
 const h = vi.hoisted(() => ({
   collectReports: vi.fn<() => Promise<ProviderReport[]>>(),
   checkWarnings: vi.fn<() => Promise<WarnHit[]>>(),
+  writeCapture: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/report", () => ({
@@ -13,6 +14,7 @@ vi.mock("@/report", () => ({
   DEFAULT_OPTIONS: { thresholdPercent: 80, cacheTtlSeconds: 120, providers: null, fallback: true },
 }));
 vi.mock("@/warn", () => ({ checkWarnings: h.checkWarnings }));
+vi.mock("@/context/system", () => ({ writeCapture: h.writeCapture }));
 
 import plugin from "@/index";
 import type { ProviderReport, UsageWindow } from "@/types";
@@ -48,7 +50,6 @@ const hit = {
 };
 
 type EventArg = Parameters<NonNullable<Hooks["event"]>>[0];
-type ConfigArg = Parameters<NonNullable<Hooks["config"]>>[0];
 
 const idleEvent: EventArg = {
   event: { type: "session.idle", properties: { sessionID: "ses_mock" } },
@@ -66,29 +67,58 @@ describe("index plugin wiring", () => {
     vi.useFakeTimers();
     h.collectReports.mockReset();
     h.checkWarnings.mockReset();
+    h.writeCapture.mockClear();
+    h.writeCapture.mockResolvedValue(undefined);
   });
 
   afterEach(() => vi.useRealTimers());
 
-  it("does not overwrite an existing usage command", async () => {
+  it("captures the system prompt size on each chat request", async () => {
     const hooks = await makeHooks();
-    const cfg = {
-      command: { usage: { template: "custom $ARGUMENTS", description: "mine" } },
-    } as unknown as ConfigArg;
+    const system = "a".repeat(4000);
 
-    await hooks.config!(cfg);
+    await hooks["experimental.chat.system.transform"]!(
+      { sessionID: "ses_1", model: { id: "k2", providerID: "kimi" } } as never,
+      { system: [system] } as never,
+    );
 
-    expect(cfg.command!.usage.template).toBe("custom $ARGUMENTS");
-    expect(cfg.command!.usage.description).toBe("mine");
+    expect(h.writeCapture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        version: 1,
+        sessionID: "ses_1",
+        providerID: "kimi",
+        modelID: "k2",
+        systemChars: 4000,
+        systemTokens: 1000,
+      }),
+    );
   });
 
-  it("injects the usage command when the user has none", async () => {
+  it("ignores a system transform with no session id or empty system", async () => {
     const hooks = await makeHooks();
-    const cfg = {} as unknown as ConfigArg;
 
-    await hooks.config!(cfg);
+    await hooks["experimental.chat.system.transform"]!(
+      { model: { id: "k2", providerID: "kimi" } } as never,
+      { system: ["x"] } as never,
+    );
+    await hooks["experimental.chat.system.transform"]!(
+      { sessionID: "ses_1", model: { id: "k2", providerID: "kimi" } } as never,
+      { system: [] } as never,
+    );
 
-    expect(cfg.command!.usage.template).toContain("usage_report");
+    expect(h.writeCapture).not.toHaveBeenCalled();
+  });
+
+  it("never throws out of the system transform hook", async () => {
+    const hooks = await makeHooks();
+    h.writeCapture.mockRejectedValueOnce(new Error("disk full"));
+
+    await expect(
+      hooks["experimental.chat.system.transform"]!(
+        { sessionID: "ses_1", model: { id: "k2", providerID: "kimi" } } as never,
+        { system: ["hello"] } as never,
+      ),
+    ).resolves.toBeUndefined();
   });
 
   it("swallows showToast rejections on session.idle (headless mode)", async () => {

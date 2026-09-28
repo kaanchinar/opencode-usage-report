@@ -375,8 +375,13 @@ sidecar that is valid JSON but wrong-version, wrong-model, and corrupt.
 | `state.output` is a non-string | coerced with `String(...)`, then estimated |
 | Quota API failure | unchanged — existing `error` row in the quota block |
 
-`api.ui.dialog.setSize("xlarge")` must be called **before** `replace()`, because
-`replace()` resets the size to `medium` and collapses the stack to depth 1.
+`api.ui.dialog.setSize()` must be called **after** `replace()`: `replace()` sets the
+size back to `"medium"` before installing the stack entry
+(`packages/tui/src/ui/dialog.tsx`), so an earlier `setSize` is discarded. The
+host's `DialogProvider` already wraps the stack entry in the panel chrome, so the
+rendered element supplies only its own padded `<box>` — wrapping it again in
+`api.ui.Dialog` would double the backdrop. `replace()` also collapses the stack
+to depth 1, so this is not a push.
 
 ## 11. Testing
 

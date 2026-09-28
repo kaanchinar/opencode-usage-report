@@ -5,9 +5,10 @@
 [![License: MIT](https://img.shields.io/npm/l/opencode-usage-report)](./LICENSE)
 
 An [opencode](https://opencode.ai) plugin that adds a `/usage` command (and a
-`usage_report` tool) showing the quota windows (5-hour, weekly, monthly) of your
-inference subscriptions — currently **Kimi Code** (both regional plans:
-`kimi-code-plan-global` on kimi.ai and `kimi-code-plan-cn` on kimi.com),
+`usage_report` tool) showing both the **context usage** of the current session and
+the **quota windows** (5-hour, weekly, monthly) of your inference subscriptions —
+currently **Kimi Code** (both regional plans: `kimi-code-plan-global` on kimi.ai
+and `kimi-code-plan-cn` on kimi.com),
 **OpenCode Go** (`opencode-go`), **GitHub Copilot** (`github-copilot`) and
 **ChatGPT** (`openai`). It fetches from each provider's API, caches
 results on disk, and can fall back to a local estimate when the API is
@@ -17,6 +18,9 @@ unreachable. It also emits background low-quota warnings in the TUI.
 
 - `/usage` command and `usage_report` tool for on-demand quota reports, with
   JSON and single-provider filtering.
+- **Context usage panel** (new in 0.4.0): the exact prompt-token total against
+  the model's context window, a cell grid that fills by category, the
+  auto-compaction threshold with live headroom, and session cost.
 - TUI sidebar panel with live progress bars, `NN%` usage, and reset countdowns
   for each quota window.
 - On-disk caching with a configurable TTL, plus `--refresh` to bypass it.
@@ -27,7 +31,11 @@ unreachable. It also emits background low-quota warnings in the TUI.
 
 ## Install
 
-### Server plugin (`/usage` command + warnings)
+Both entrypoints are needed for the full experience: the server plugin supplies
+the `usage_report` tool, the low-quota warnings and the system-prompt capture;
+the TUI plugin supplies `/usage` itself and the sidebar panel.
+
+### Server plugin (`usage_report` tool + warnings + capture)
 
 Add the plugin to `opencode.json` / `opencode.jsonc` and restart opencode:
 
@@ -47,7 +55,7 @@ options in the tuple form:
 }
 ```
 
-### TUI sidebar panel
+### TUI plugin (`/usage` command + sidebar panel)
 
 Add the plugin to `tui.json` and restart opencode:
 
@@ -70,31 +78,83 @@ For local development, point the configs at the source instead:
 { "plugin": ["file:///abs/path/to/opencode-usage-report/src/tui.tsx"] }
 ```
 
-The panel renders under opencode's native Context block in the session sidebar
-(order 150) and shows a colored progress bar per quota window, `NN%`, and a
-live reset countdown — refreshed every 60s, on `session.idle`, and on demand via
-the `Usage: refresh now` command (default binding `ctrl+shift+u`). It reuses the
-same cache/fallback pipeline as the command; stale results are marked `(stale)`
-and local estimates `(est)`.
+The sidebar panel renders under opencode's native Context block (order 150) and
+shows a colored progress bar per quota window, `NN%`, and a live reset countdown
+— refreshed every 60s, on `session.idle`, and on demand via the
+`Usage: refresh now` command (default binding `ctrl+shift+u`). It reuses the same
+cache/fallback pipeline as the command; stale results are marked `(stale)` and
+local estimates `(est)`.
 
 TUI options (tuple form): `providers`, `cacheTtlSeconds`, `thresholdPercent`,
 `refreshIntervalSeconds` (default `60`), `barWidth` (default `14`).
 
 ## Commands
 
-- `/usage` — show every configured provider's quota windows. Providers without a
-  resolved credential are skipped in this view.
-- `/usage kimi-code-plan-global` — filter to a single provider. The argument must
-  match a registered provider id **exactly** (`kimi-code-plan-global`,
-  `kimi-code-plan-cn`, `opencode-go`, `github-copilot` or `openai`); an unknown
-  id (e.g. `/usage kimi`)
-  returns a helpful error listing the known ids. An explicitly requested
-  provider with no credential is reported as an error row.
-- `/usage --json` — emit the raw `ProviderReport[]` JSON.
-- `/usage --refresh` — bypass the on-disk cache and fetch live.
+- `/usage` — open the report dialog: the context usage panel for the current
+  session on top, every configured provider's quota windows below. This is a
+  local TUI command, so it costs no model tokens. Requires the TUI plugin.
+  Providers without a resolved credential are skipped in this view.
+- `/usage` dialog keys: `esc` close, `r` refresh, `tab` cycle provider scope
+  (all → each provider), `j` toggle the raw JSON view.
+- `usage_report` tool — the same report for agents and headless runs. Takes
+  `provider` (exact id: `kimi-code-plan-global`, `kimi-code-plan-cn`,
+  `opencode-go`, `github-copilot` or `openai`; an unknown id returns a helpful
+  error listing the known ids), `json` (raw `ProviderReport[]`) and `refresh`
+  (bypass the on-disk cache).
 
-The command simply calls the `usage_report` tool with those arguments, so the
-tool can also be invoked directly by an agent.
+> **Changed in 0.4.0.** `/usage` was previously an LLM-mediated prompt template
+> that routed through the model, and it accepted `--json` / `--refresh` /
+> a provider id as slash arguments. The TUI command now owns the name and those
+> capabilities are dialog keys or tool arguments. Running `/usage` with an
+> argument (`/usage --json`) is no longer supported — use the `usage_report`
+> tool for scripted access.
+
+## Context usage panel
+
+The top of the `/usage` dialog reports how full the model's context window is
+for the current session:
+
+```
+  Context
+  Kimi K2 (High) · 42,318 / 200,000 tokens (21.2%)
+
+  ██████████████████████  ████████████████████████████████  ████  ██████████████████████████████
+  ██  ████████████████████  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+  …
+
+  ● User messages      8,204   4.1%      ● System & tools    8,144   4.1%
+  ● Agent responses   11,650   5.8%      ● Free space     157,682  78.8%
+  ● Reasoning          2,140   1.1%
+  ● Tool calls        12,180   6.1%
+
+  Auto-compacts at 180,000 · 137,682 headroom        $0.42 spent
+```
+
+**What is exact.** The headline total, the percentage, free space, the
+compaction threshold, the cost, and the number of pruned tool outputs all come
+straight from numbers the provider and opencode report. The total is the prompt
+size — `input + cache.read + cache.write` — which is what actually occupies the
+context window. opencode's own sidebar Context block sums five fields including
+the completion, so it reads slightly higher than this panel by design.
+
+**What is estimated.** The per-category rows. opencode does not record a token
+count per message or per part, so each category is estimated with the same
+`characters / 4` heuristic opencode itself uses, then normalized so the rows
+agree with the exact total.
+
+**System & tools.** opencode assembles the system prompt and tool definitions on
+every request and never persists them. The server plugin measures the real
+system string through the `experimental.chat.system.transform` hook and stores
+only its size, so the row can be split into `system prompt` and
+`tools & framing`. This hook is undocumented, so it is treated as best-effort:
+if it stops firing, the sidecar goes stale, or anything fails to validate, the
+panel falls back to the derived residual and labels the row `(derived)`. The
+plugin never breaks a request over it.
+
+**Compaction headroom.** `Auto-compacts at N` mirrors opencode's own overflow
+check, including the configured `compaction.reserved` buffer. This is the point
+at which opencode automatically summarizes the session, and opencode exposes it
+nowhere else.
 
 ## Options
 
@@ -134,7 +194,8 @@ per window until that window resets; it re-arms after usage drops below
   ChatGPT**. ChatGPT additionally needs the account id that login writes to
   `auth.json`; the plugin reads it automatically.
 - Cache and state live in `<data-home>/usage-report/` (TTL cache, session id,
-  warn state).
+  warn state, and `context/<sessionID>.json` — the system-prompt size sidecar,
+  which holds counts only, never prompt text).
 - Local fallback reads `opencode.db` read-only.
 - **API keys are never logged, cached, or rendered.** Adapter errors are
   sanitized (key substrings replaced with `<redacted>`) before they reach any

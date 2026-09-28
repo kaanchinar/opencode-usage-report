@@ -113,13 +113,23 @@ function rightAlign(value: string, width: number): string {
   return value.length >= width ? value : " ".repeat(width - value.length) + value;
 }
 
+/**
+ * One-decimal percentage. A non-zero share that would round to `0.0%` reads as
+ * "nothing at all", so anything under a tenth of a percent collapses to `<0.1%`.
+ */
+export function formatPercent(percent: number): string {
+  const value = typeof percent === "number" && Number.isFinite(percent) ? percent : 0;
+  if (value > 0 && value < 0.1) return "<0.1%";
+  return `${Math.min(100, Math.max(0, value)).toFixed(1)}%`;
+}
+
 function headerMetric(breakdown: ContextBreakdown): string {
   if (breakdown.ready !== true) return "0 (0.0%)";
   const total = nonNegative(breakdown.total) ?? 0;
   const limit = nonNegative(breakdown.limit);
   if (limit === null || limit <= 0) return `${formatTokens(total)} tokens`;
-  const percent = Math.min(100, Math.max(0, (total / limit) * 100));
-  return `${formatTokens(total)} / ${formatTokens(limit)} tokens (${percent.toFixed(1)}%)`;
+  const percent = (total / limit) * 100;
+  return `${formatTokens(total)} / ${formatTokens(limit)} tokens (${formatPercent(percent)})`;
 }
 
 function rowMap(breakdown: ContextBreakdown): Map<RowKey, ContextRow> {
@@ -141,8 +151,7 @@ function legendEntry(key: RowKey, row: ContextRow | undefined, systemDerived: bo
   const label = key === "system" && systemDerived ? `${baseLabel} (derived)` : baseLabel;
   const tokens = nonNegative(row?.tokens);
   const percent = nonNegative(row?.percent);
-  const percentText =
-    percent === null ? "—" : `${Math.min(100, percent).toFixed(1)}%`;
+  const percentText = percent === null ? "—" : formatPercent(percent);
   return [
     { text: "● ", fg: CATEGORY_TONES[key] },
     { text: padLabel(label, LEGEND_LABEL_WIDTH), fg: "text" },

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildContextLines, formatMoney, formatTokens } from "@/context/format";
+import { buildContextLines, formatMoney, formatPercent, formatTokens } from "@/context/format";
 import type { ContextBreakdown, ContextRow, GridCell, RowKey } from "@/context/types";
 
 const LABELS: Record<RowKey, string> = {
@@ -258,5 +258,37 @@ describe("buildContextLines defensiveness", () => {
     for (const breakdown of variants) {
       expect(concat(buildContextLines(breakdown))).not.toMatch(/NaN|undefined/);
     }
+  });
+});
+
+describe("formatPercent", () => {
+  it("collapses a sub-tenth percentage instead of rendering 0.0%", () => {
+    expect(formatPercent(0.04)).toBe("<0.1%");
+    expect(formatPercent(0)).toBe("0.0%");
+    expect(formatPercent(0.1)).toBe("0.1%");
+    expect(formatPercent(21.24)).toBe("21.2%");
+    expect(formatPercent(140)).toBe("100.0%");
+    expect(formatPercent(-5)).toBe("0.0%");
+    expect(formatPercent(Number.NaN)).toBe("0.0%");
+  });
+
+  it("never shows 0.0% for a populated row on a large context window", () => {
+    const small = baseBreakdown({
+      total: 30000,
+      limit: 200000,
+      rows: [
+        row("user", 83, 0.04),
+        row("agent", 93, 0.05),
+        row("reasoning", 450, 0.23),
+        row("tools", 6006, 3),
+        row("system", 23368, 11.7),
+        row("free", 170000, 85),
+      ],
+    });
+    const text = buildContextLines(small)
+      .map((line) => line.segments.map((seg) => seg.text).join(""))
+      .join("\n");
+    expect(text).not.toMatch(/\b0\.0%/);
+    expect(text).toContain("<0.1%");
   });
 });
