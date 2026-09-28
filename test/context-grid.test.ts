@@ -31,13 +31,21 @@ describe("buildGrid", () => {
   });
 
   it("returns empty cells when the limit is unknown or zero", () => {
-    expect(buildGrid({ rows: [row("user", 5)], limit: null, total: 5, cols: 10 }).cells).toEqual([]);
+    expect(buildGrid({ rows: [row("user", 5)], limit: null, total: 5, cols: 10 }).cells).toEqual(
+      [],
+    );
     expect(buildGrid({ rows: [row("user", 5)], limit: 0, total: 5, cols: 10 }).cells).toEqual([]);
     expect(buildGrid({ rows: [row("user", 5)], limit: -1, total: 5, cols: 10 }).cells).toEqual([]);
   });
 
   it("renders a hollow grid when total is unknown", () => {
-    const grid = buildGrid({ rows: [row("user", 5)], limit: 100, total: null, cols: 10, gridRows: 1 });
+    const grid = buildGrid({
+      rows: [row("user", 5)],
+      limit: 100,
+      total: null,
+      cols: 10,
+      gridRows: 1,
+    });
     expect(grid.cells).toHaveLength(10);
     expect(grid.cells.every((cell) => cell.rowKey === null && cell.fill === 0)).toBe(true);
   });

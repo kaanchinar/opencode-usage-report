@@ -157,12 +157,7 @@ describe("buildContextLines grid", () => {
     );
     const [grid] = lines.filter(isGridLine);
     expect(lineText(grid)).toBe("░░▒▒▓▓██");
-    expect(grid.segments.map((s) => s.fg)).toEqual([
-      "info",
-      "success",
-      "secondary",
-      "warning",
-    ]);
+    expect(grid.segments.map((s) => s.fg)).toEqual(["info", "success", "secondary", "warning"]);
   });
 
   it("colours free cells with borderSubtle", () => {

@@ -76,7 +76,10 @@ describe("computeHeadroom", () => {
       computeHeadroom({ limit: { context: Number.NaN, output: 100 } as never, total: 100 }),
     ).toEqual({ usable: null, free: null, band: "ok" });
     expect(
-      computeHeadroom({ limit: { context: 1000, output: Number.POSITIVE_INFINITY } as never, total: 1 }),
+      computeHeadroom({
+        limit: { context: 1000, output: Number.POSITIVE_INFINITY } as never,
+        total: 1,
+      }),
     ).toEqual({ usable: null, free: null, band: "ok" });
   });
 

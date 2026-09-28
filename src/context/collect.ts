@@ -158,7 +158,9 @@ export function collectContext(input: CollectInput): ContextBreakdown {
   const cache: Record<string, unknown> = isRecord(tokens.cache) ? tokens.cache : {};
   const total = Math.max(
     0,
-    (finiteOrNull(tokens.input) ?? 0) + (finiteOrNull(cache.read) ?? 0) + (finiteOrNull(cache.write) ?? 0),
+    (finiteOrNull(tokens.input) ?? 0) +
+      (finiteOrNull(cache.read) ?? 0) +
+      (finiteOrNull(cache.write) ?? 0),
   );
 
   let userTokens = 0;
@@ -192,12 +194,15 @@ export function collectContext(input: CollectInput): ContextBreakdown {
       } else if (type === "tool") {
         const state = part.state;
         const stateRecord: Record<string, unknown> = isRecord(state) ? state : {};
-        const timeRecord: Record<string, unknown> = isRecord(stateRecord.time) ? stateRecord.time : {};
+        const timeRecord: Record<string, unknown> = isRecord(stateRecord.time)
+          ? stateRecord.time
+          : {};
         if (timeRecord.compacted !== undefined && timeRecord.compacted !== null) {
           prunedToolOutputs += 1;
           continue;
         }
-        toolsTokens += estimateJson(stateRecord.input) + estimateTokens(safeString(stateRecord.output));
+        toolsTokens +=
+          estimateJson(stateRecord.input) + estimateTokens(safeString(stateRecord.output));
       }
       // step-start, step-finish, snapshot and every other part type are skipped.
     }

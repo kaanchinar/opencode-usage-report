@@ -53,15 +53,15 @@ that fill by category, and a legend of per-category rows.
 
 ## 3. Locked decisions
 
-| # | Decision |
-|---|---|
-| D1 | The TUI plugin owns `/usage` entirely. `cfg.command.usage` is deleted. |
-| D2 | Stacked single scrollbox: context block on top, divider, existing quota output below. |
-| D3 | Six rows: user messages, agent responses, reasoning, tool calls, system & tools, free space. |
-| D4 | The system prompt is captured exactly in this release, with a mandatory residual fallback. |
-| D5 | Header (model, total, percent), compaction headroom line, and session cost. |
-| D6 | Grid is 6 rows, cells 2 columns wide, adapting to dialog width. |
-| D7 | Empty state is Antigravity-literal: hollow grid, `0 (0.0%)`, "awaiting first response" caption. |
+| #   | Decision                                                                                        |
+| --- | ----------------------------------------------------------------------------------------------- |
+| D1  | The TUI plugin owns `/usage` entirely. `cfg.command.usage` is deleted.                          |
+| D2  | Stacked single scrollbox: context block on top, divider, existing quota output below.           |
+| D3  | Six rows: user messages, agent responses, reasoning, tool calls, system & tools, free space.    |
+| D4  | The system prompt is captured exactly in this release, with a mandatory residual fallback.      |
+| D5  | Header (model, total, percent), compaction headroom line, and session cost.                     |
+| D6  | Grid is 6 rows, cells 2 columns wide, adapting to dialog width.                                 |
+| D7  | Empty state is Antigravity-literal: hollow grid, `0 (0.0%)`, "awaiting first response" caption. |
 
 ### D1 rationale and the one regression
 
@@ -79,7 +79,7 @@ spent. Verified at `packages/tui/src/keymap.tsx:260-289` — a command needs
 `namespace: "palette"` (`:265`), a non-empty `slashName` (`:272`), and
 `hidden !== true` (`:49-51`).
 
-**Accepted regression:** slash *arguments* go away. `/usage --json` and
+**Accepted regression:** slash _arguments_ go away. `/usage --json` and
 `/usage <provider>` required a trailing space, which closes the autocomplete;
 with no server command registered, the literal text would be sent to the model as
 a prompt. The same capabilities move to dialog keys (§8) and remain available
@@ -109,19 +109,19 @@ unit-testable under the existing `npm test` (vitest, no network).
 
 ### 4.1 Files
 
-| File | Kind | Purpose |
-|---|---|---|
-| `src/context/types.ts` | types | `ContextBreakdown`, `ContextRow`, `GridCell`, `SystemCapture` |
-| `src/context/estimate.ts` | pure | `estimateTokens(text)` — mirrors `packages/core/src/util/token.ts` |
-| `src/context/headroom.ts` | pure | compaction headroom + band |
-| `src/context/collect.ts` | pure | `(input) => ContextBreakdown` |
-| `src/context/grid.ts` | pure | cell layout from a breakdown |
-| `src/context/format.ts` | pure | breakdown → `Line[]` (pre-colored segments), like `tui-format.ts` |
-| `src/context/system.ts` | io | sidecar read/write, atomic, defensive |
-| `src/context/dialog.tsx` | jsx | renders the context block |
-| `src/quota-lines.ts` | pure | `buildLines` extracted verbatim from `src/tui.tsx` |
-| `src/tui.tsx` | jsx | + `/usage` command; existing panel unchanged |
-| `src/index.ts` | plugin | − `cfg.command.usage`, + system-prompt hook |
+| File                      | Kind   | Purpose                                                            |
+| ------------------------- | ------ | ------------------------------------------------------------------ |
+| `src/context/types.ts`    | types  | `ContextBreakdown`, `ContextRow`, `GridCell`, `SystemCapture`      |
+| `src/context/estimate.ts` | pure   | `estimateTokens(text)` — mirrors `packages/core/src/util/token.ts` |
+| `src/context/headroom.ts` | pure   | compaction headroom + band                                         |
+| `src/context/collect.ts`  | pure   | `(input) => ContextBreakdown`                                      |
+| `src/context/grid.ts`     | pure   | cell layout from a breakdown                                       |
+| `src/context/format.ts`   | pure   | breakdown → `Line[]` (pre-colored segments), like `tui-format.ts`  |
+| `src/context/system.ts`   | io     | sidecar read/write, atomic, defensive                              |
+| `src/context/dialog.tsx`  | jsx    | renders the context block                                          |
+| `src/quota-lines.ts`      | pure   | `buildLines` extracted verbatim from `src/tui.tsx`                 |
+| `src/tui.tsx`             | jsx    | + `/usage` command; existing panel unchanged                       |
+| `src/index.ts`            | plugin | − `cfg.command.usage`, + system-prompt hook                        |
 
 ## 5. Data model
 
@@ -132,25 +132,25 @@ interface ContextRow {
   key: RowKey;
   label: string;
   tokens: number | null;
-  percent: number | null;   // 0-100, null when the limit is unknown
-  exact: boolean;           // true for rows derived from provider-reported numbers
+  percent: number | null; // 0-100, null when the limit is unknown
+  exact: boolean; // true for rows derived from provider-reported numbers
 }
 
 interface GridCell {
-  rowKey: RowKey | null;    // null = free space
-  fill: number;             // 0..1
+  rowKey: RowKey | null; // null = free space
+  fill: number; // 0..1
 }
 
 interface ContextBreakdown {
-  ready: boolean;           // false until an assistant message reports usage
+  ready: boolean; // false until an assistant message reports usage
   modelName: string | null;
-  total: number | null;     // exact prompt tokens
+  total: number | null; // exact prompt tokens
   limit: number | null;
   cost: number;
-  rows: ContextRow[];       // always 6, in the order above
+  rows: ContextRow[]; // always 6, in the order above
   grid: { cols: number; rows: number; cells: GridCell[] };
   headroom: { usable: number | null; free: number | null; band: "ok" | "warning" | "error" };
-  systemDerived: boolean;   // true when the capture was unusable
+  systemDerived: boolean; // true when the capture was unusable
   prunedToolOutputs: number;
 }
 
@@ -161,7 +161,7 @@ interface SystemCapture {
   modelID: string;
   systemChars: number;
   systemTokens: number;
-  capturedAt: number;       // epoch ms
+  capturedAt: number; // epoch ms
 }
 ```
 
@@ -201,15 +201,15 @@ Walk only the messages that are still in context, mirroring
 start after the most recent assistant message with `summary === true`. Part
 classification:
 
-| Part | Category | Text measured |
-|---|---|---|
-| user `text` | user | part text |
-| user `file` | user | filename + mime (binary content is not measured) |
-| assistant `text` | agent | part text |
-| assistant `reasoning` | reasoning | part text |
-| `tool` with `state.time.compacted` set | — | **skipped**, counted in `prunedToolOutputs` |
-| `tool` otherwise | tools | `JSON.stringify(state.input)` + `state.output` |
-| `step-start`, `step-finish`, `snapshot` | — | skipped (accounting, not context) |
+| Part                                    | Category  | Text measured                                    |
+| --------------------------------------- | --------- | ------------------------------------------------ |
+| user `text`                             | user      | part text                                        |
+| user `file`                             | user      | filename + mime (binary content is not measured) |
+| assistant `text`                        | agent     | part text                                        |
+| assistant `reasoning`                   | reasoning | part text                                        |
+| `tool` with `state.time.compacted` set  | —         | **skipped**, counted in `prunedToolOutputs`      |
+| `tool` otherwise                        | tools     | `JSON.stringify(state.input)` + `state.output`   |
+| `step-start`, `step-finish`, `snapshot` | —         | skipped (accounting, not context)                |
 
 Tool call arguments and tool outputs share the single "Tool calls" row; they are
 not split. Tool outputs are usually the larger half, which is the useful signal.
@@ -271,18 +271,18 @@ Cells fill left-to-right, then top-to-bottom, in category order
 `clamp(0, 1, remaining / tokensPerCell)`, so the cell straddling the exact total
 renders partially rather than rounding up, and cumulative fill is additionally
 clamped so it never exceeds `total` (see §6.5). `free` is never materialised as
-cells — unfilled cells *are* free space, which is what makes the block read as a
+cells — unfilled cells _are_ free space, which is what makes the block read as a
 fill-level meter.
 
 Glyphs, chosen to match the `█`/`░` already used by `bar()` in
 `src/tui-format.ts:28`:
 
-| fill | glyph | color token |
-|---|---|---|
-| `0` | `░░` | `theme.borderSubtle` |
-| `(0, 0.25]` | `▒▒` | category color |
-| `(0.25, 0.75]` | `▓▓` | category color |
-| `(0.75, 1]` | `██` | category color |
+| fill           | glyph | color token          |
+| -------------- | ----- | -------------------- |
+| `0`            | `░░`  | `theme.borderSubtle` |
+| `(0, 0.25]`    | `▒▒`  | category color       |
+| `(0.25, 0.75]` | `▓▓`  | category color       |
+| `(0.75, 1]`    | `██`  | category color       |
 
 Category colors: user `info`, agent `success`, reasoning `secondary`, tools
 `warning`, system `textMuted`.
@@ -315,12 +315,12 @@ panel exists to surface: opencode has no UI for it anywhere.
 Dialog keys, registered as a keymap layer scoped to `mode: "modal"` so they only
 fire while the dialog is open:
 
-| Key | Action |
-|---|---|
-| `esc` | close (host-bound; also clears on backdrop click) |
-| `r` | `usage.refresh` — refetch quota data, existing command |
-| `tab` | cycle provider scope: all → each provider in turn |
-| `j` | toggle the raw JSON view of both sections |
+| Key   | Action                                                 |
+| ----- | ------------------------------------------------------ |
+| `esc` | close (host-bound; also clears on backdrop click)      |
+| `r`   | `usage.refresh` — refetch quota data, existing command |
+| `tab` | cycle provider scope: all → each provider in turn      |
+| `j`   | toggle the raw JSON view of both sections              |
 
 The `usage_report` tool keeps its `provider` / `json` / `refresh` arguments
 unchanged.
@@ -365,15 +365,15 @@ sidecar that is valid JSON but wrong-version, wrong-model, and corrupt.
 
 ## 10. Error handling
 
-| Condition | Behavior |
-|---|---|
-| No assistant message with usage | `ready: false`; hollow grid, `0 (0.0%)`, "awaiting first response" |
-| `model.limit.context` missing | grid omitted; rows show counts, percentages `null` |
-| No model resolved for the message | header shows the raw `providerID/modelID` |
-| Sidecar unusable | residual path, row labelled `derived` (D7) |
-| `messages` / `part` return malformed entries | skipped; never throws |
-| `state.output` is a non-string | coerced with `String(...)`, then estimated |
-| Quota API failure | unchanged — existing `error` row in the quota block |
+| Condition                                    | Behavior                                                           |
+| -------------------------------------------- | ------------------------------------------------------------------ |
+| No assistant message with usage              | `ready: false`; hollow grid, `0 (0.0%)`, "awaiting first response" |
+| `model.limit.context` missing                | grid omitted; rows show counts, percentages `null`                 |
+| No model resolved for the message            | header shows the raw `providerID/modelID`                          |
+| Sidecar unusable                             | residual path, row labelled `derived` (D7)                         |
+| `messages` / `part` return malformed entries | skipped; never throws                                              |
+| `state.output` is a non-string               | coerced with `String(...)`, then estimated                         |
+| Quota API failure                            | unchanged — existing `error` row in the quota block                |
 
 `api.ui.dialog.setSize()` must be called **after** `replace()`: `replace()` sets the
 size back to `"medium"` before installing the stack entry
@@ -391,6 +391,7 @@ or renderer mocking is required. The dialog JSX itself is untested, matching
 the rendered output stays testable.
 
 `collect.ts`
+
 - empty session; session with no assistant message; `ready` transitions correctly
 - six-row split sums to `total`; percentages never exceed 100
 - `tokens.input` treated as cache-exclusive (cache tokens counted once)
@@ -405,18 +406,21 @@ the rendered output stays testable.
 - non-string `state.output`, missing `state`, `null` entries → no throw, no `NaN`
 
 `headroom.ts`
+
 - `limit.input` present vs absent branches
 - `compaction.reserved` override beats the `min(20000, maxOutput)` default
 - band thresholds at exactly 5% and 15%
 - `usable` clamped at 0
 
 `grid.ts`
+
 - cell count equals `cols * rows`; fill values within `[0, 1]`
 - fill order matches category order; a partial cell appears at the total boundary
 - cumulative fill never exceeds `total` even with inflated row values
 - `cols` clamped at both ends; zero/negative width falls back to the minimum
 
 `system.ts`
+
 - write→read round trip
 - atomic write leaves no partial file
 - invalid JSON, wrong version, wrong session, wrong model, stale `capturedAt`,
@@ -424,11 +428,13 @@ the rendered output stays testable.
 - `OPENCODE_DATA_HOME` override honoured
 
 `format.ts`
+
 - header line format for populated and empty states
 - legend rows in fixed order with correct labels and percentages
 - `derived` marker present only when `systemDerived`
 
 `quota-lines.ts`
+
 - existing `buildLines` cases ported unchanged from the current coverage
 
 ## 12. Tasks

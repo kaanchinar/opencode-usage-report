@@ -27,8 +27,7 @@ function nonNegative(value: unknown): number | null {
 /** <pluginStateDir>/context/<sanitized-sessionID>.json */
 export function contextCapturePath(sessionID: string, env?: NodeJS.ProcessEnv): string {
   const raw = typeof sessionID === "string" ? sessionID : "";
-  const safe =
-    raw.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, MAX_SESSION_ID_LENGTH) || "_";
+  const safe = raw.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, MAX_SESSION_ID_LENGTH) || "_";
   return join(pluginStateDir(env), "context", `${safe}.json`);
 }
 
@@ -79,10 +78,7 @@ export async function readCapture(
  * Atomically persists a capture (temp file + rename), throttled to at most one
  * write per session per 60 s unless the provider/model changed. Never throws.
  */
-export async function writeCapture(
-  capture: SystemCapture,
-  env?: NodeJS.ProcessEnv,
-): Promise<void> {
+export async function writeCapture(capture: SystemCapture, env?: NodeJS.ProcessEnv): Promise<void> {
   try {
     if (!isRecord(capture)) return;
     const { sessionID, providerID, modelID } = capture;
@@ -98,9 +94,7 @@ export async function writeCapture(
 
     const previous = await readCapture(sessionID, env);
     const modelChanged =
-      previous === null ||
-      previous.providerID !== providerID ||
-      previous.modelID !== modelID;
+      previous === null || previous.providerID !== providerID || previous.modelID !== modelID;
 
     const now = Date.now();
     const last = writeThrottle.get(sessionID);

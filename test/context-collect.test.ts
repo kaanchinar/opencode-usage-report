@@ -62,7 +62,15 @@ function filePart(filename: string, mime: string): Part {
   } as unknown as Part;
 }
 function toolPart(state: unknown): Part {
-  return { id: "part", sessionID: "s1", messageID: "", type: "tool", callID: "c", tool: "t", state } as unknown as Part;
+  return {
+    id: "part",
+    sessionID: "s1",
+    messageID: "",
+    type: "tool",
+    callID: "c",
+    tool: "t",
+    state,
+  } as unknown as Part;
 }
 function simplePart(type: string): Part {
   return { id: "part", sessionID: "s1", messageID: "", type } as unknown as Part;
@@ -106,7 +114,9 @@ describe("collectContext empty states", () => {
     expect(breakdown.rows).toHaveLength(6);
     expect(breakdown.rows.every((row) => row.tokens === null && row.percent === null)).toBe(true);
     expect(breakdown.grid.cells).toHaveLength(60);
-    expect(breakdown.grid.cells.every((cell) => cell.rowKey === null && cell.fill === 0)).toBe(true);
+    expect(breakdown.grid.cells.every((cell) => cell.rowKey === null && cell.fill === 0)).toBe(
+      true,
+    );
     expect(breakdown.prunedToolOutputs).toBe(0);
     expect(breakdown.systemDerived).toBe(true);
     expect(containsNaN(breakdown)).toBe(false);
@@ -151,7 +161,10 @@ describe("collectContext totals", () => {
 
   it("splits the measured rows so they sum to the total", () => {
     const breakdown = collectContext({
-      messages: [userMessage("u1"), assistantMessage("a1", { input: 100, cache: { read: 20, write: 5 } })],
+      messages: [
+        userMessage("u1"),
+        assistantMessage("a1", { input: 100, cache: { read: 20, write: 5 } }),
+      ],
       model: testModel(1000),
       part: accessor({ u1: [textPart("hello world!")] }),
     });
@@ -169,7 +182,11 @@ describe("collectContext totals", () => {
       model: testModel(1000),
     });
     expect(breakdown.total).toBe(2000);
-    expect(breakdown.rows.every((row) => row.percent === null || (row.percent >= 0 && row.percent <= 100))).toBe(true);
+    expect(
+      breakdown.rows.every(
+        (row) => row.percent === null || (row.percent >= 0 && row.percent <= 100),
+      ),
+    ).toBe(true);
     expect(breakdown.rows.some((row) => row.percent === 100)).toBe(true);
     expect(value(breakdown, "free")).toBe(0);
   });
@@ -212,7 +229,12 @@ describe("collectContext part classification", () => {
             output: "hello",
             time: { start: 1, end: 2, compacted: 99 },
           }),
-          toolPart({ status: "completed", input: { y: 2 }, output: "ok", time: { start: 1, end: 2 } }),
+          toolPart({
+            status: "completed",
+            input: { y: 2 },
+            output: "ok",
+            time: { start: 1, end: 2 },
+          }),
         ],
       }),
     });
@@ -225,7 +247,12 @@ describe("collectContext part classification", () => {
       messages: [assistantMessage("a1", { input: 100 })],
       model: testModel(1000),
       part: accessor({
-        a1: [simplePart("step-start"), simplePart("step-finish"), simplePart("snapshot"), simplePart("patch")],
+        a1: [
+          simplePart("step-start"),
+          simplePart("step-finish"),
+          simplePart("snapshot"),
+          simplePart("patch"),
+        ],
       }),
     });
     expect(value(breakdown, "agent")).toBe(0);
@@ -322,7 +349,12 @@ describe("collectContext defensiveness", () => {
       model: testModel(1000),
       part: accessor({
         a1: [
-          toolPart({ status: "completed", input: { a: 1 }, output: 12345, time: { start: 1, end: 2 } }),
+          toolPart({
+            status: "completed",
+            input: { a: 1 },
+            output: 12345,
+            time: { start: 1, end: 2 },
+          }),
           toolPart(undefined),
           toolPart({}),
           toolPart(null),
@@ -334,7 +366,11 @@ describe("collectContext defensiveness", () => {
   });
 
   it("skips null message and part entries", () => {
-    const messages = [null, userMessage("u1"), assistantMessage("a1", { input: 100 })] as unknown as Message[];
+    const messages = [
+      null,
+      userMessage("u1"),
+      assistantMessage("a1", { input: 100 }),
+    ] as unknown as Message[];
     const parts = accessor({ u1: [null as unknown as Part, textPart("abcd")] });
     const breakdown = collectContext({ messages, model: testModel(1000), part: parts });
     expect(breakdown.ready).toBe(true);
@@ -372,7 +408,9 @@ describe("collectContext defensiveness", () => {
     expect(collectContext(base).systemDerived).toBe(true);
     expect(collectContext({ ...base, system: null }).systemDerived).toBe(true);
     expect(collectContext({ ...base, system: validCapture() }).systemDerived).toBe(false);
-    expect(collectContext({ ...base, system: validCapture({ version: 2 }) }).systemDerived).toBe(true);
+    expect(collectContext({ ...base, system: validCapture({ version: 2 }) }).systemDerived).toBe(
+      true,
+    );
     expect(
       collectContext({ ...base, system: validCapture({ systemTokens: Number.NaN }) }).systemDerived,
     ).toBe(true);
@@ -393,8 +431,21 @@ describe("collectContext defensiveness", () => {
       { messages: [], model: testModel(1000) },
       { messages: [assistantMessage("a1", { input: 100 })], model: testModel(1000) },
       { messages: [assistantMessage("a1", { input: 100 })], model: null },
-      { messages: [userMessage("u1"), assistantMessage("a1", { input: 5 })], model: testModel(10), part: accessor({ u1: [textPart("x".repeat(9000))] }) },
-      { messages: [{ role: "assistant", id: "broken", tokens: { output: 1, input: "nope", cache: null } } as unknown as Message], model: testModel(100) },
+      {
+        messages: [userMessage("u1"), assistantMessage("a1", { input: 5 })],
+        model: testModel(10),
+        part: accessor({ u1: [textPart("x".repeat(9000))] }),
+      },
+      {
+        messages: [
+          {
+            role: "assistant",
+            id: "broken",
+            tokens: { output: 1, input: "nope", cache: null },
+          } as unknown as Message,
+        ],
+        model: testModel(100),
+      },
     ];
     for (const input of inputs) {
       const breakdown = collectContext(input);

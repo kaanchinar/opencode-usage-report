@@ -84,7 +84,9 @@ export function UsageDialog(props: UsageDialogProps) {
   const model = createMemo<Model | undefined>(() => {
     const last = reference();
     if (last === undefined) return undefined;
-    return props.api.state.provider.find((item) => item.id === last.providerID)?.models[last.modelID];
+    return props.api.state.provider.find((item) => item.id === last.providerID)?.models[
+      last.modelID
+    ];
   });
 
   /** The capture only counts when it matches this message's session, model and turn. */
@@ -126,7 +128,9 @@ export function UsageDialog(props: UsageDialogProps) {
     return last === undefined ? null : `${last.providerID}/${last.modelID}`;
   });
 
-  const contextLines = createMemo(() => buildContextLines(breakdown(), { modelLabel: modelLabel() }));
+  const contextLines = createMemo(() =>
+    buildContextLines(breakdown(), { modelLabel: modelLabel() }),
+  );
   const quotaLines = createMemo(() =>
     buildLines(theme(), scopedReports(), props.busy(), props.error(), props.now(), props.barWidth),
   );
