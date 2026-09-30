@@ -8,7 +8,7 @@ import { AdapterError } from "../types";
 import { redact } from "../auth";
 
 /** Sent as the User-Agent on every provider request; keep in sync with package.json. */
-export const USER_AGENT = "opencode-usage-report/0.4.0";
+export const USER_AGENT = "opencode-usage-report/0.4.1";
 
 export function asRecord(v: unknown): Record<string, unknown> | null {
   return v !== null && typeof v === "object" && !Array.isArray(v)
