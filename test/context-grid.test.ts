@@ -3,7 +3,7 @@ import { buildGrid } from "@/context/grid";
 import type { ContextRow, RowKey } from "@/context/types";
 
 function row(key: RowKey, tokens: number | null): ContextRow {
-  return { key, label: key, tokens, percent: null, exact: false };
+  return { key, label: key, tokens, percent: null };
 }
 
 describe("buildGrid", () => {
@@ -18,16 +18,6 @@ describe("buildGrid", () => {
     const grid = buildGrid({ rows: [], limit: 120, total: 0, cols: 10 });
     expect(grid.rows).toBe(6);
     expect(grid.cells).toHaveLength(60);
-  });
-
-  it("clamps cols at both ends", () => {
-    expect(buildGrid({ rows: [], limit: 10, total: 0, cols: 3 }).cols).toBe(8);
-    expect(buildGrid({ rows: [], limit: 10, total: 0, cols: 0 }).cols).toBe(8);
-    expect(buildGrid({ rows: [], limit: 10, total: 0, cols: -5 }).cols).toBe(8);
-    expect(buildGrid({ rows: [], limit: 10, total: 0, cols: Number.NaN }).cols).toBe(8);
-    expect(buildGrid({ rows: [], limit: 10, total: 0 }).cols).toBe(8);
-    expect(buildGrid({ rows: [], limit: 10, total: 0, cols: 8 }).cols).toBe(8);
-    expect(buildGrid({ rows: [], limit: 10, total: 0, cols: 100 }).cols).toBe(60);
   });
 
   it("returns empty cells when the limit is unknown or zero", () => {

@@ -7,22 +7,11 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { SystemCapture } from "./types";
+import { isRecord, nonNegative } from "../normalize";
 import { pluginStateDir } from "../paths";
 
 const CAPTURE_VERSION = 1;
-const WRITE_THROTTLE_MS = 60_000;
 const MAX_SESSION_ID_LENGTH = 200;
-
-/** sessionID -> epoch ms of the last successful write, for throttling. */
-const writeThrottle = new Map<string, number>();
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function nonNegative(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
-}
 
 /** <pluginStateDir>/context/<sanitized-sessionID>.json */
 export function contextCapturePath(sessionID: string, env?: NodeJS.ProcessEnv): string {
@@ -35,10 +24,6 @@ export function contextCapturePath(sessionID: string, env?: NodeJS.ProcessEnv): 
  * Reads and validates a capture. Returns null for a missing/unreadable file,
  * invalid JSON, an unsupported version, a session mismatch, non-string
  * provider/model, or non-finite/negative sizes and timestamps.
- *
- * Deliberately independent of the write-throttle map: the server plugin writes
- * and the TUI plugin reads in separate processes, so a reader can never have a
- * throttle entry of its own.
  */
 export async function readCapture(
   sessionID: string,
@@ -74,10 +59,7 @@ export async function readCapture(
   }
 }
 
-/**
- * Atomically persists a capture (temp file + rename), throttled to at most one
- * write per session per 60 s unless the provider/model changed. Never throws.
- */
+/** Atomically persists a capture (temp file + rename). Never throws. */
 export async function writeCapture(capture: SystemCapture, env?: NodeJS.ProcessEnv): Promise<void> {
   try {
     if (!isRecord(capture)) return;
@@ -91,14 +73,6 @@ export async function writeCapture(capture: SystemCapture, env?: NodeJS.ProcessE
     const systemTokens = nonNegative(capture.systemTokens);
     const capturedAt = nonNegative(capture.capturedAt);
     if (systemChars === null || systemTokens === null || capturedAt === null) return;
-
-    const previous = await readCapture(sessionID, env);
-    const modelChanged =
-      previous === null || previous.providerID !== providerID || previous.modelID !== modelID;
-
-    const now = Date.now();
-    const last = writeThrottle.get(sessionID);
-    if (!modelChanged && typeof last === "number" && now - last < WRITE_THROTTLE_MS) return;
 
     const directory = join(pluginStateDir(env), "context");
     await mkdir(directory, { recursive: true });
@@ -115,7 +89,6 @@ export async function writeCapture(capture: SystemCapture, env?: NodeJS.ProcessE
     const tmp = `${file}.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`;
     await writeFile(tmp, JSON.stringify(normalized), "utf8");
     await rename(tmp, file);
-    writeThrottle.set(sessionID, now);
   } catch {
     // Capture writes are best-effort; a failure must never break a request.
   }
@@ -139,9 +112,4 @@ export function captureIsFresh(
   const since = nonNegative(ref.since);
   if (capturedAt === null || since === null) return false;
   return capturedAt >= since;
-}
-
-/** Clears the write-throttle map so tests can reset between cases. */
-export function resetCaptureThrottle(): void {
-  writeThrottle.clear();
 }

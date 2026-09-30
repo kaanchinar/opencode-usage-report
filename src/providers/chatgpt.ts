@@ -9,16 +9,9 @@ import type {
 import { AdapterError } from "../types";
 import { toISODate, toNumber } from "../normalize";
 import { redact } from "../auth";
+import { asRecord, handleError, readBody, request } from "./http";
 
-const VERSION = "0.3.0";
-const USER_AGENT = "opencode-usage-report/" + VERSION;
 const ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
-
-function asRecord(v: unknown): Record<string, unknown> | null {
-  return v !== null && typeof v === "object" && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null;
-}
 
 /** "foo_bar-baz" -> "Foo Bar Baz". */
 function titleCase(v: string): string {
@@ -54,74 +47,6 @@ function windowKind(seconds: number | null): { kind: WindowKind; label: string }
   return { kind: "other", label: "Other" };
 }
 
-/** Reads the body once as text and best-effort parses JSON, so error and success paths share it. */
-async function readBody(res: Response): Promise<{ text: string; json: unknown }> {
-  const text = await res.text().catch(() => "");
-  let json: unknown = null;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    json = null;
-  }
-  return { text, json };
-}
-
-async function attempt(cred: Credential, accountId: string, opts: FetchOptions): Promise<Response> {
-  return fetch(ENDPOINT, {
-    method: "GET",
-    headers: {
-      Authorization: "Bearer " + cred.key,
-      "ChatGPT-Account-Id": accountId,
-      Accept: "application/json",
-      "User-Agent": USER_AGENT,
-    },
-    signal: AbortSignal.timeout(opts.timeoutMs),
-  });
-}
-
-/** Exactly one retry on a network throw or 5xx; 4xx is returned immediately (never retried). */
-async function request(cred: Credential, accountId: string, opts: FetchOptions): Promise<Response> {
-  try {
-    const first = await attempt(cred, accountId, opts);
-    if (first.status < 500) return first;
-  } catch {
-    // fall through to the single retry
-  }
-
-  try {
-    return await attempt(cred, accountId, opts);
-  } catch (err) {
-    throw new AdapterError(
-      "network",
-      redact(
-        `ChatGPT request failed: ${err instanceof Error ? err.message : String(err)}`,
-        cred.key,
-      ),
-    );
-  }
-}
-
-async function handleError(res: Response, cred: Credential): Promise<never> {
-  const { text } = await readBody(res);
-
-  if (res.status === 401) {
-    throw new AdapterError("auth", redact("invalid ChatGPT login", cred.key));
-  }
-  if (res.status === 403) {
-    throw new AdapterError("no-plan", redact("ChatGPT is not enabled for this account", cred.key));
-  }
-  if (res.status === 429) {
-    throw new AdapterError("rate-limited", redact("ChatGPT rate limit reached", cred.key));
-  }
-  if (res.status >= 500) {
-    throw new AdapterError("network", redact(`ChatGPT server error ${res.status}`, cred.key));
-  }
-  throw new AdapterError(
-    "bad-response",
-    redact(`ChatGPT unexpected status ${res.status}: ${text.slice(0, 200)}`, cred.key),
-  );
-}
-
 export const chatgptAdapter: ProviderAdapter = {
   id: "openai",
   displayName: "ChatGPT",
@@ -130,8 +55,29 @@ export const chatgptAdapter: ProviderAdapter = {
       throw new AdapterError("auth", "ChatGPT account id missing (re-run: opencode auth login)");
     }
 
-    const res = await request(cred, cred.accountId, opts);
-    if (!res.ok) return handleError(res, cred);
+    const res = await request(cred, opts, {
+      endpoint: ENDPOINT,
+      label: "ChatGPT request failed",
+      headers: { "ChatGPT-Account-Id": cred.accountId },
+    });
+    if (!res.ok) {
+      return handleError(res, cred, (status, { text }) => {
+        if (status === 401) return { kind: "auth", message: "invalid ChatGPT login" };
+        if (status === 403) {
+          return { kind: "no-plan", message: "ChatGPT is not enabled for this account" };
+        }
+        if (status === 429) {
+          return { kind: "rate-limited", message: "ChatGPT rate limit reached" };
+        }
+        if (status >= 500) {
+          return { kind: "network", message: `ChatGPT server error ${status}` };
+        }
+        return {
+          kind: "bad-response",
+          message: `ChatGPT unexpected status ${status}: ${text.slice(0, 200)}`,
+        };
+      });
+    }
 
     const { json } = await readBody(res);
     const body = asRecord(json);

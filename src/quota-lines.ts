@@ -6,7 +6,7 @@
  */
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
 import type { ProviderReport, WindowKind } from "./types";
-import { bar, countdown, percentText, toneFor, windowLabel } from "./tui-format";
+import { bar, clip, countdown, padLabel, percentText, toneFor, windowLabel } from "./tui-format";
 
 type Theme = TuiPluginApi["theme"]["current"];
 type ThemeColor = Theme["text"];
@@ -25,30 +25,13 @@ export const NAMED_WIDTH = 14;
 export const EXTRAS_MAX_LENGTH = 80;
 
 /** Order windows for display; unknown kinds sort last. */
-export const WINDOW_ORDER: Record<WindowKind, number> = {
+const WINDOW_ORDER: Record<WindowKind, number> = {
   "5h": 0,
   weekly: 1,
   monthly: 2,
   daily: 3,
   other: 4,
 };
-
-export function windowRank(kind: WindowKind): number {
-  return WINDOW_ORDER[kind] ?? WINDOW_ORDER.other;
-}
-
-/** Collapses whitespace and truncates to a single-line label. */
-export function clip(value: string, max = 60): string {
-  const single = value.replace(/\s+/g, " ").trim();
-  if (single.length <= max) return single;
-  return single.slice(0, Math.max(0, max - 1)) + "…";
-}
-
-/** Pads a label to a fixed width, truncating (with a trailing space) when long. */
-export function alignLabel(label: string): string {
-  const text = label.length > NAMED_WIDTH ? label.slice(0, NAMED_WIDTH - 1) + " " : label;
-  return text.padEnd(NAMED_WIDTH);
-}
 
 /** Flattens provider reports into plain, pre-colored text lines. */
 export function buildLines(
@@ -89,11 +72,11 @@ export function buildLines(
       continue;
     }
 
-    const windows = report.windows.toSorted((a, b) => windowRank(a.kind) - windowRank(b.kind));
+    const windows = report.windows.toSorted((a, b) => WINDOW_ORDER[a.kind] - WINDOW_ORDER[b.kind]);
     for (const w of windows) {
       const tone = toneFor(w.usedPercent, w.status);
       const row: Segment[] = [
-        { text: alignLabel(windowLabel(w.kind, w.label)), fg: theme.textMuted },
+        { text: padLabel(windowLabel(w.kind, w.label), NAMED_WIDTH), fg: theme.textMuted },
         { text: bar(w.usedPercent, barWidth), fg: theme[tone] },
         { text: " ", fg: theme.text },
         { text: percentText(w), fg: theme.text },

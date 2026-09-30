@@ -10,9 +10,8 @@ import type {
 import { AdapterError } from "../types";
 import { toISODate, toNumber } from "../normalize";
 import { redact } from "../auth";
+import { asRecord, handleError, readBody, request } from "./http";
 
-const VERSION = "0.3.0";
-const USER_AGENT = "opencode-usage-report/" + VERSION;
 const ENDPOINT = "https://opencode.ai/zen/go/v1/usage";
 
 /** Additive options: `sessionId` is optional, so the adapter still satisfies `ProviderAdapter`. */
@@ -26,12 +25,6 @@ const WINDOWS: Array<{ key: string; kind: WindowKind; label: string }> = [
 
 function mapStatus(v: unknown): WindowStatus {
   return v === "ok" || v === "rate-limited" ? v : "unknown";
-}
-
-function asRecord(v: unknown): Record<string, unknown> | null {
-  return v !== null && typeof v === "object" && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null;
 }
 
 function buildWindow(kind: WindowKind, label: string, src: unknown): UsageWindow | null {
@@ -49,91 +42,42 @@ function buildWindow(kind: WindowKind, label: string, src: unknown): UsageWindow
   };
 }
 
-/** Reads the body once as text and best-effort parses JSON, so error and success paths share it. */
-async function readBody(res: Response): Promise<{ text: string; json: unknown }> {
-  const text = await res.text().catch(() => "");
-  let json: unknown = null;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    json = null;
-  }
-  return { text, json };
-}
-
-async function attempt(cred: Credential, opts: OpenCodeGoFetchOptions): Promise<Response> {
-  return fetch(ENDPOINT, {
-    method: "GET",
-    headers: {
-      Authorization: "Bearer " + cred.key,
-      Accept: "application/json",
-      "User-Agent": USER_AGENT,
-      "x-opencode-session": opts.sessionId ?? "unknown",
-    },
-    signal: AbortSignal.timeout(opts.timeoutMs),
-  });
-}
-
-/** Exactly one retry on a network throw or 5xx; 4xx is returned immediately (never retried). */
-async function request(cred: Credential, opts: OpenCodeGoFetchOptions): Promise<Response> {
-  try {
-    const first = await attempt(cred, opts);
-    if (first.status < 500) return first;
-  } catch {
-    // fall through to the single retry
-  }
-
-  try {
-    return await attempt(cred, opts);
-  } catch (err) {
-    throw new AdapterError(
-      "network",
-      redact(
-        `OpenCode Go request failed: ${err instanceof Error ? err.message : String(err)}`,
-        cred.key,
-      ),
-    );
-  }
-}
-
-async function handleError(res: Response, cred: Credential): Promise<never> {
-  const { text, json } = await readBody(res);
-
-  if (res.status === 401) {
-    throw new AdapterError("auth", redact("invalid OpenCode Go API key", cred.key));
-  }
-  if (res.status === 403) {
-    const record = asRecord(json);
-    const error = record ? asRecord(record.error) : null;
-    if (error && error.type === "EntitlementError") {
-      throw new AdapterError(
-        "no-plan",
-        redact("OpenCode Go subscription not active on this key", cred.key),
-      );
-    }
-    throw new AdapterError(
-      "network",
-      redact("OpenCode Go request blocked (check User-Agent)", cred.key),
-    );
-  }
-  if (res.status === 429) {
-    throw new AdapterError("rate-limited", redact("OpenCode Go rate limit reached", cred.key));
-  }
-  if (res.status >= 500) {
-    throw new AdapterError("network", redact(`OpenCode Go server error ${res.status}`, cred.key));
-  }
-  throw new AdapterError(
-    "bad-response",
-    redact(`OpenCode Go unexpected status ${res.status}: ${text.slice(0, 200)}`, cred.key),
-  );
-}
-
 export const opencodeGoAdapter: ProviderAdapter = {
   id: "opencode-go",
   displayName: "OpenCode Go",
   async fetch(cred: Credential, opts: OpenCodeGoFetchOptions): Promise<AdapterResult> {
-    const res = await request(cred, opts);
-    if (!res.ok) return handleError(res, cred);
+    const res = await request(cred, opts, {
+      endpoint: ENDPOINT,
+      label: "OpenCode Go request failed",
+      headers: { "x-opencode-session": opts.sessionId ?? "unknown" },
+    });
+
+    if (!res.ok) {
+      return handleError(res, cred, (status, { text, json }) => {
+        if (status === 401) return { kind: "auth", message: "invalid OpenCode Go API key" };
+        if (status === 403) {
+          const record = asRecord(json);
+          const error = record ? asRecord(record.error) : null;
+          if (error && error.type === "EntitlementError") {
+            return {
+              kind: "no-plan",
+              message: "OpenCode Go subscription not active on this key",
+            };
+          }
+          return { kind: "network", message: "OpenCode Go request blocked (check User-Agent)" };
+        }
+        if (status === 429) {
+          return { kind: "rate-limited", message: "OpenCode Go rate limit reached" };
+        }
+        if (status >= 500) {
+          return { kind: "network", message: `OpenCode Go server error ${status}` };
+        }
+        return {
+          kind: "bad-response",
+          message: `OpenCode Go unexpected status ${status}: ${text.slice(0, 200)}`,
+        };
+      });
+    }
 
     const { json } = await readBody(res);
     const body = asRecord(json);

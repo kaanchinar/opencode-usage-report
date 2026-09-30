@@ -1,8 +1,8 @@
 import type { ContextRow, GridCell, RowKey } from "./types";
+import { finiteOrNull } from "../normalize";
 
 const GRID_ROWS_DEFAULT = 6;
-const MIN_COLS = 8;
-const MAX_COLS = 60;
+const GRID_COLS_DEFAULT = 8;
 const CATEGORY_ORDER: readonly RowKey[] = ["user", "agent", "reasoning", "tools", "system"];
 
 export interface BuildGridInput {
@@ -11,20 +11,6 @@ export interface BuildGridInput {
   total: number | null;
   cols?: number | null;
   gridRows?: number | null;
-}
-
-function finiteOrNull(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function clampCols(value: number | null | undefined): number {
-  const n = finiteOrNull(value);
-  return Math.min(MAX_COLS, Math.max(MIN_COLS, n === null ? MIN_COLS : Math.floor(n)));
-}
-
-function clampGridRows(value: number | null | undefined): number {
-  const n = finiteOrNull(value);
-  return n !== null && Math.floor(n) >= 1 ? Math.floor(n) : GRID_ROWS_DEFAULT;
 }
 
 function rowTokens(rows: readonly ContextRow[], key: RowKey): number {
@@ -58,8 +44,8 @@ export function buildGrid(input: BuildGridInput): {
   rows: number;
   cells: GridCell[];
 } {
-  const cols = clampCols(input.cols);
-  const rows = clampGridRows(input.gridRows);
+  const cols = finiteOrNull(input.cols) ?? GRID_COLS_DEFAULT;
+  const rows = finiteOrNull(input.gridRows) ?? GRID_ROWS_DEFAULT;
   const limit = finiteOrNull(input.limit);
   if (limit === null || limit <= 0) return { cols, rows, cells: [] };
 

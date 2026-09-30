@@ -72,22 +72,19 @@ export const tui: TuiPlugin = async (api, rawOptions) => {
   };
 
   const intervalMs = Math.max(1, Math.floor(options.refreshIntervalSeconds)) * 1000;
-  const timer = setInterval(() => {
+  const refresh = (): void => {
     setTick(Date.now());
     void load();
     void refreshCapture();
-  }, intervalMs);
+  };
+  const timer = setInterval(refresh, intervalMs);
 
   api.lifecycle.onDispose(() => {
     disposed = true;
     clearInterval(timer);
   });
 
-  const offIdle = api.event.on("session.idle", () => {
-    setTick(Date.now());
-    void load();
-    void refreshCapture();
-  });
+  const offIdle = api.event.on("session.idle", refresh);
   api.lifecycle.onDispose(offIdle);
 
   const openDialog = (): void => {

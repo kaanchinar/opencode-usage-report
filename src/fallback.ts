@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import type { AdapterResult, UsageWindow } from "./types";
 import { dbPath } from "./paths";
+import { asRecord } from "./providers/http";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -14,12 +15,6 @@ interface SqliteDatabase {
   close(): void;
 }
 type DatabaseSyncCtor = new (path: string, options?: { readOnly?: boolean }) => SqliteDatabase;
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
 
 function toNum(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;

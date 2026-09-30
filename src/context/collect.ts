@@ -1,6 +1,7 @@
 import type { AssistantMessage, Part } from "@opencode-ai/sdk/v2";
 import type { CollectInput, ContextBreakdown, ContextRow, RowKey, SystemCapture } from "./types";
 import { estimateJson, estimateTokens } from "./estimate";
+import { finiteOrNull, isRecord, safeString } from "../normalize";
 import { buildGrid } from "./grid";
 import { computeHeadroom } from "./headroom";
 
@@ -14,24 +15,6 @@ const ROW_LABELS: Record<RowKey, string> = {
 };
 
 const MEASURED_KEYS: readonly RowKey[] = ["user", "agent", "reasoning", "tools", "system"];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function finiteOrNull(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function safeString(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (value === null || value === undefined) return "";
-  try {
-    return String(value);
-  } catch {
-    return "";
-  }
-}
 
 function isAssistant(value: unknown): value is AssistantMessage {
   return isRecord(value) && value.role === "assistant";
@@ -72,49 +55,25 @@ function isUsableCapture(capture: SystemCapture | null | undefined): capture is 
 }
 
 /**
- * Scales `values` so they sum to `target` by the largest-remainder method; the
- * result never exceeds `target`. Used when raw `chars/4` estimates overshoot.
+ * Scales `values` proportionally so they sum to at most `target`; each row is an
+ * estimate, so flooring may leave the five rows a few tokens short of the total.
  */
-function largestRemainderScale(
-  values: readonly number[],
-  target: number,
-  divisor: number,
-): number[] {
+function scaleToTotal(values: readonly number[], target: number, divisor: number): number[] {
   if (!Number.isFinite(divisor) || divisor <= 0) return values.map(() => 0);
   const total = Math.max(0, Math.round(target));
-  const scaled = values.map((value) => (value > 0 ? (value * total) / divisor : 0));
-  const rounded = scaled.map((value) => Math.floor(value));
-  let deficit = total - rounded.reduce((sum, value) => sum + value, 0);
-  if (deficit <= 0) return rounded;
-
-  const order = scaled
-    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
-    .sort((a, b) => b.fraction - a.fraction);
-  for (const { index } of order) {
-    if (deficit <= 0) break;
-    rounded[index] += 1;
-    deficit -= 1;
-  }
-  return rounded;
+  return values.map((value) => (value > 0 ? Math.floor((value * total) / divisor) : 0));
 }
 
-function makeRow(
-  key: RowKey,
-  tokens: number | null,
-  exact: boolean,
-  limit: number | null,
-): ContextRow {
+function makeRow(key: RowKey, tokens: number | null, limit: number | null): ContextRow {
   const percent =
     tokens !== null && limit !== null && limit > 0
       ? Math.min(100, Math.max(0, Math.round((tokens / limit) * 100)))
       : null;
-  return { key, label: ROW_LABELS[key], tokens, percent, exact };
+  return { key, label: ROW_LABELS[key], tokens, percent };
 }
 
 function emptyRows(limit: number | null): ContextRow[] {
-  return [...MEASURED_KEYS, "free" as RowKey].map((key) =>
-    makeRow(key, null, key === "free", limit),
-  );
+  return [...MEASURED_KEYS, "free" as RowKey].map((key) => makeRow(key, null, limit));
 }
 
 /**
@@ -212,9 +171,9 @@ export function collectContext(input: CollectInput): ContextBreakdown {
   let systemTokens = Math.max(0, total - estimatedSum);
 
   // chars/4 is an estimate in both directions; when it overshoots the exact
-  // total, scale all five measured rows down so they sum to `total` (6.5).
+  // total, scale all five measured rows down so they sum to at most `total` (6.5).
   if (estimatedSum > total) {
-    const scaled = largestRemainderScale(
+    const scaled = scaleToTotal(
       [userTokens, agentTokens, reasoningTokens, toolsTokens, systemTokens],
       total,
       estimatedSum,
@@ -227,9 +186,9 @@ export function collectContext(input: CollectInput): ContextBreakdown {
   }
 
   const measured = [userTokens, agentTokens, reasoningTokens, toolsTokens, systemTokens];
-  const rows = MEASURED_KEYS.map((key, index) => makeRow(key, measured[index], false, limit));
+  const rows = MEASURED_KEYS.map((key, index) => makeRow(key, measured[index], limit));
   const freeTokens = limit !== null ? Math.max(0, limit - total) : null;
-  rows.push(makeRow("free", freeTokens, true, limit));
+  rows.push(makeRow("free", freeTokens, limit));
 
   return {
     ready: true,

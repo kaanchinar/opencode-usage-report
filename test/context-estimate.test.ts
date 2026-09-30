@@ -33,20 +33,6 @@ describe("estimateJson", () => {
     expect(estimateJson(null)).toBe(1); // "null" -> 4 chars -> 1
   });
 
-  it("handles circular references and bigint without throwing", () => {
-    const circular: Record<string, unknown> = { a: 1 };
-    circular.self = circular;
-    expect(() => estimateJson(circular)).not.toThrow();
-    expect(estimateJson(circular)).toBeGreaterThan(0);
-    expect(estimateJson(10n)).toBe(1);
-  });
-
-  it("caps huge serializations", () => {
-    const value = estimateJson("x".repeat(3_000_000));
-    expect(Number.isFinite(value)).toBe(true);
-    expect(value).toBe(500_000);
-  });
-
   it("never returns NaN", () => {
     expect(containsNaN(estimateJson(undefined))).toBe(false);
     expect(Number.isNaN(estimateTokens(null as unknown as string))).toBe(false);

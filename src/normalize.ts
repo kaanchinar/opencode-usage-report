@@ -1,5 +1,3 @@
-import type { UsageWindow, WindowKind } from "./types";
-
 /** Accepts a number or a numeric string; anything else (including NaN/Infinity) yields null. */
 export function toNumber(v: unknown): number | null {
   if (typeof v === "number") {
@@ -45,31 +43,23 @@ export function pick(obj: unknown, ...keys: string[]): unknown {
   return undefined;
 }
 
-/** Converts a 0-1 ratio into a 0-100 percent, clamped to [0,100] and rounded to 1 decimal. */
-export function ratioToPercent(ratio: number): number {
-  const rounded = Math.round(ratio * 1000) / 10;
-  return Math.min(100, Math.max(0, rounded));
+/** Finite number or null; numeric strings are not coerced. */
+export function finiteOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** Builds a window from tolerant count fields, deriving usedPercent only when used and a positive limit are known. */
-export function windowFromCounts(
-  kind: WindowKind,
-  label: string,
-  detail: { limit?: unknown; used?: unknown; remaining?: unknown; reset?: unknown },
-): UsageWindow {
-  const used = toNumber(detail.used);
-  const limit = toNumber(detail.limit);
-  const remaining = toNumber(detail.remaining);
-  const usedPercent =
-    used !== null && limit !== null && limit > 0 ? Math.round((used / limit) * 100) : null;
-  return {
-    kind,
-    label,
-    usedPercent,
-    used,
-    limit,
-    remaining,
-    resetsAt: toISODate(detail.reset),
-    status: "ok",
-  };
+/** Finite number >= 0 or null. */
+export function nonNegative(value: unknown): number | null {
+  const n = finiteOrNull(value);
+  return n !== null && n >= 0 ? n : null;
+}
+
+/** Plain-object guard: null and arrays are not records. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Tolerant string coercion; null and undefined become "". */
+export function safeString(value: unknown): string {
+  return String(value ?? "");
 }

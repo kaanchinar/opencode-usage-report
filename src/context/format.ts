@@ -4,6 +4,8 @@
  * same shape `buildLines` uses in `src/quota-lines.ts`.
  */
 import type { ContextBreakdown, ContextRow, GridCell, RowKey } from "./types";
+import { finiteOrNull, nonNegative } from "../normalize";
+import { padLabel } from "../tui-format";
 
 /** Theme color names used by the context block. */
 export type ContextTone =
@@ -40,15 +42,6 @@ const LEGEND_PERCENT_WIDTH = 6;
 const LEGEND_GAP = "   ";
 const COLUMNS_PER_LEGEND_ROW = 3;
 
-const ROW_LABELS: Record<RowKey, string> = {
-  user: "User messages",
-  agent: "Agent responses",
-  reasoning: "Reasoning",
-  tools: "Tool calls",
-  system: "System & tools",
-  free: "Free space",
-};
-
 const CATEGORY_TONES: Record<RowKey, ContextTone> = {
   user: "info",
   agent: "success",
@@ -79,15 +72,6 @@ export function formatMoney(n: number): string {
   return MONEY.format(value);
 }
 
-function finite(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function nonNegative(value: unknown): number | null {
-  const n = finite(value);
-  return n !== null && n >= 0 ? n : null;
-}
-
 function glyphFor(fill: number): string {
   if (fill <= 0) return "░░";
   if (fill <= 0.25) return "▒▒";
@@ -98,19 +82,6 @@ function glyphFor(fill: number): string {
 function toneForRowKey(key: unknown): ContextTone {
   if (typeof key !== "string") return "borderSubtle";
   return CATEGORY_TONES[key as RowKey] ?? "borderSubtle";
-}
-
-function truncateLabel(label: string, width: number): string {
-  if (label.length <= width) return label;
-  return label.slice(0, Math.max(0, width - 1)) + "…";
-}
-
-function padLabel(label: string, width: number): string {
-  return truncateLabel(label, width).padEnd(width);
-}
-
-function rightAlign(value: string, width: number): string {
-  return value.length >= width ? value : " ".repeat(width - value.length) + value;
 }
 
 /**
@@ -144,10 +115,7 @@ function rowMap(breakdown: ContextBreakdown): Map<RowKey, ContextRow> {
 }
 
 function legendEntry(key: RowKey, row: ContextRow | undefined, systemDerived: boolean): Segment[] {
-  const baseLabel =
-    row !== undefined && typeof row.label === "string" && row.label !== ""
-      ? row.label
-      : ROW_LABELS[key];
+  const baseLabel = row?.label ?? key;
   const label = key === "system" && systemDerived ? `${baseLabel} (derived)` : baseLabel;
   const tokens = nonNegative(row?.tokens);
   const percent = nonNegative(row?.percent);
@@ -156,11 +124,11 @@ function legendEntry(key: RowKey, row: ContextRow | undefined, systemDerived: bo
     { text: "● ", fg: CATEGORY_TONES[key] },
     { text: padLabel(label, LEGEND_LABEL_WIDTH), fg: "text" },
     {
-      text: rightAlign(tokens === null ? "—" : formatTokens(tokens), LEGEND_COUNT_WIDTH),
+      text: (tokens === null ? "—" : formatTokens(tokens)).padStart(LEGEND_COUNT_WIDTH, " "),
       fg: "text",
     },
     { text: " ", fg: "text" },
-    { text: rightAlign(percentText, LEGEND_PERCENT_WIDTH), fg: "textMuted" },
+    { text: percentText.padStart(LEGEND_PERCENT_WIDTH, " "), fg: "textMuted" },
   ];
 }
 
@@ -178,7 +146,7 @@ function gridLines(breakdown: ContextBreakdown): Line[] {
     const segments: Segment[] = [];
     for (let c = 0; c < renderCols; c++) {
       const cell = cells[r * cols + c] as GridCell | undefined;
-      const fill = cell === undefined ? 0 : Math.min(1, Math.max(0, finite(cell.fill) ?? 0));
+      const fill = cell === undefined ? 0 : Math.min(1, Math.max(0, finiteOrNull(cell.fill) ?? 0));
       segments.push({ text: glyphFor(fill), fg: toneForRowKey(cell?.rowKey) });
     }
     lines.push({ segments });

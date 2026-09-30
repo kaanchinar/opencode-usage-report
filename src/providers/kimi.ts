@@ -4,12 +4,12 @@ import type {
   FetchOptions,
   ProviderAdapter,
   UsageWindow,
+  WindowKind,
 } from "../types";
 import { AdapterError } from "../types";
-import { pick, ratioToPercent, toISODate, toNumber, windowFromCounts } from "../normalize";
+import { pick, toISODate, toNumber } from "../normalize";
 import { redact } from "../auth";
-
-const VERSION = "0.3.0";
+import { handleError, readBody, request } from "./http";
 
 /**
  * Kimi Code is split by region in opencode/models.dev: the global plan lives on
@@ -23,39 +23,33 @@ export interface KimiAdapterConfig {
   baseUrl: string;
 }
 
-function request(cred: Credential, opts: FetchOptions, endpoint: string): Promise<Response> {
-  return fetch(endpoint, {
-    method: "GET",
-    headers: {
-      Authorization: "Bearer " + cred.key,
-      Accept: "application/json",
-      "User-Agent": "opencode-usage-report/" + VERSION,
-    },
-    signal: AbortSignal.timeout(opts.timeoutMs),
-  });
+/** Converts a 0-1 ratio into a 0-100 percent, clamped to [0,100] and rounded to 1 decimal. */
+function ratioToPercent(ratio: number): number {
+  const rounded = Math.round(ratio * 1000) / 10;
+  return Math.min(100, Math.max(0, rounded));
 }
 
-/** One retry on network throw or 5xx; 4xx and 2xx return immediately. */
-async function fetchWithRetry(
-  cred: Credential,
-  opts: FetchOptions,
-  endpoint: string,
-): Promise<Response> {
-  let lastError: unknown = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const res = await request(cred, opts, endpoint);
-      if (res.status >= 500) {
-        lastError = new Error(`HTTP ${res.status}`);
-        continue;
-      }
-      return res;
-    } catch (err) {
-      lastError = err;
-    }
-  }
-  const detail = lastError instanceof Error ? lastError.message : String(lastError);
-  throw new AdapterError("network", redact(`Kimi API network error: ${detail}`, cred.key));
+/** Builds a window from tolerant count fields, deriving usedPercent only when used and a positive limit are known. */
+function windowFromCounts(
+  kind: WindowKind,
+  label: string,
+  detail: { limit?: unknown; used?: unknown; remaining?: unknown; reset?: unknown },
+): UsageWindow {
+  const used = toNumber(detail.used);
+  const limit = toNumber(detail.limit);
+  const remaining = toNumber(detail.remaining);
+  const usedPercent =
+    used !== null && limit !== null && limit > 0 ? Math.round((used / limit) * 100) : null;
+  return {
+    kind,
+    label,
+    usedPercent,
+    used,
+    limit,
+    remaining,
+    resetsAt: toISODate(detail.reset),
+    status: "ok",
+  };
 }
 
 function findLimitDetail(limits: unknown, durationMinutes: number): unknown {
@@ -174,39 +168,33 @@ export function createKimiAdapter(config: KimiAdapterConfig): ProviderAdapter {
     id: config.id,
     displayName: config.displayName,
     async fetch(cred: Credential, opts: FetchOptions): Promise<AdapterResult> {
-      const res = await fetchWithRetry(cred, opts, endpoint);
+      const res = await request(cred, opts, {
+        endpoint,
+        label: "Kimi API network error",
+      });
 
-      if (res.status === 401) {
-        throw new AdapterError("auth", redact("invalid Kimi API key", cred.key));
-      }
-      if (res.status === 429) {
-        throw new AdapterError("rate-limited", redact("Kimi API rate limit exceeded", cred.key));
-      }
-      if (res.status < 200 || res.status >= 300) {
-        throw new AdapterError(
-          "bad-response",
-          redact(`Kimi API returned HTTP ${res.status}`, cred.key),
-        );
-      }
-
-      let body: unknown;
-      try {
-        body = await res.json();
-      } catch {
-        throw new AdapterError(
-          "bad-response",
-          redact("Kimi API returned a non-JSON response", cred.key),
-        );
+      if (!res.ok) {
+        return handleError(res, cred, (status) => {
+          if (status === 401) return { kind: "auth", message: "invalid Kimi API key" };
+          if (status === 429) {
+            return { kind: "rate-limited", message: "Kimi API rate limit exceeded" };
+          }
+          if (status >= 500) {
+            return { kind: "network", message: `Kimi API network error: HTTP ${status}` };
+          }
+          return { kind: "bad-response", message: `Kimi API returned HTTP ${status}` };
+        });
       }
 
-      if (body === null || typeof body !== "object" || Array.isArray(body)) {
+      const { json } = await readBody(res);
+      if (json === null || typeof json !== "object" || Array.isArray(json)) {
         throw new AdapterError(
           "bad-response",
           redact("Kimi API returned an unexpected response shape", cred.key),
         );
       }
 
-      return parse(body as Record<string, unknown>, cred);
+      return parse(json as Record<string, unknown>, cred);
     },
   };
 }

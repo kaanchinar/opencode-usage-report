@@ -12,7 +12,7 @@ const LABELS: Record<RowKey, string> = {
 };
 
 function row(key: RowKey, tokens: number | null, percent: number | null): ContextRow {
-  return { key, label: LABELS[key], tokens, percent, exact: key === "free" };
+  return { key, label: LABELS[key], tokens, percent };
 }
 
 function cell(rowKey: RowKey | null, fill: number): GridCell {

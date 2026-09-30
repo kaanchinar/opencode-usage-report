@@ -8,9 +8,8 @@ import type {
 import { AdapterError } from "../types";
 import { toISODate, toNumber } from "../normalize";
 import { redact } from "../auth";
+import { asRecord, handleError, readBody, request } from "./http";
 
-const VERSION = "0.3.0";
-const USER_AGENT = "opencode-usage-report/" + VERSION;
 const ENDPOINT = "https://api.github.com/copilot_internal/user";
 
 /** Snapshot keys in display order, paired with their human-readable labels. */
@@ -19,12 +18,6 @@ const SNAPSHOTS: Array<{ key: string; label: string }> = [
   { key: "completions", label: "Completions" },
   { key: "premium_interactions", label: "Premium interactions" },
 ];
-
-function asRecord(v: unknown): Record<string, unknown> | null {
-  return v !== null && typeof v === "object" && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null;
-}
 
 /** "foo_bar-baz" -> "Foo Bar Baz". */
 function titleCase(v: string): string {
@@ -60,88 +53,37 @@ export function copilotTier(sku: unknown, plan: unknown): string {
   return "Copilot";
 }
 
-/** Reads the body once as text and best-effort parses JSON, so error and success paths share it. */
-async function readBody(res: Response): Promise<{ text: string; json: unknown }> {
-  const text = await res.text().catch(() => "");
-  let json: unknown = null;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    json = null;
-  }
-  return { text, json };
-}
-
-async function attempt(cred: Credential, opts: FetchOptions): Promise<Response> {
-  return fetch(ENDPOINT, {
-    method: "GET",
-    headers: {
-      Authorization: "Bearer " + cred.key,
-      Accept: "application/json",
-      "User-Agent": USER_AGENT,
-    },
-    signal: AbortSignal.timeout(opts.timeoutMs),
-  });
-}
-
-/** Exactly one retry on a network throw or 5xx; 4xx is returned immediately (never retried). */
-async function request(cred: Credential, opts: FetchOptions): Promise<Response> {
-  try {
-    const first = await attempt(cred, opts);
-    if (first.status < 500) return first;
-  } catch {
-    // fall through to the single retry
-  }
-
-  try {
-    return await attempt(cred, opts);
-  } catch (err) {
-    throw new AdapterError(
-      "network",
-      redact(
-        `GitHub Copilot request failed: ${err instanceof Error ? err.message : String(err)}`,
-        cred.key,
-      ),
-    );
-  }
-}
-
-async function handleError(res: Response, cred: Credential): Promise<never> {
-  const { text } = await readBody(res);
-
-  if (res.status === 401 || res.status === 404) {
-    throw new AdapterError(
-      "auth",
-      redact("GitHub Copilot login invalid or not available for this account", cred.key),
-    );
-  }
-  if (res.status === 403) {
-    throw new AdapterError(
-      "no-plan",
-      redact("GitHub Copilot is not enabled for this account", cred.key),
-    );
-  }
-  if (res.status === 429) {
-    throw new AdapterError("rate-limited", redact("GitHub Copilot rate limit reached", cred.key));
-  }
-  if (res.status >= 500) {
-    throw new AdapterError(
-      "network",
-      redact(`GitHub Copilot server error ${res.status}`, cred.key),
-    );
-  }
-  throw new AdapterError(
-    "bad-response",
-    redact(`GitHub Copilot unexpected status ${res.status}: ${text.slice(0, 200)}`, cred.key),
-  );
-}
-
 export const copilotAdapter: ProviderAdapter = {
   id: "github-copilot",
   displayName: "GitHub Copilot",
   async fetch(cred: Credential, opts: FetchOptions): Promise<AdapterResult> {
-    const res = await request(cred, opts);
-    if (!res.ok) return handleError(res, cred);
+    const res = await request(cred, opts, {
+      endpoint: ENDPOINT,
+      label: "GitHub Copilot request failed",
+    });
+    if (!res.ok) {
+      return handleError(res, cred, (status, { text }) => {
+        if (status === 401 || status === 404) {
+          return {
+            kind: "auth",
+            message: "GitHub Copilot login invalid or not available for this account",
+          };
+        }
+        if (status === 403) {
+          return { kind: "no-plan", message: "GitHub Copilot is not enabled for this account" };
+        }
+        if (status === 429) {
+          return { kind: "rate-limited", message: "GitHub Copilot rate limit reached" };
+        }
+        if (status >= 500) {
+          return { kind: "network", message: `GitHub Copilot server error ${status}` };
+        }
+        return {
+          kind: "bad-response",
+          message: `GitHub Copilot unexpected status ${status}: ${text.slice(0, 200)}`,
+        };
+      });
+    }
 
     const { json } = await readBody(res);
     const body = asRecord(json);

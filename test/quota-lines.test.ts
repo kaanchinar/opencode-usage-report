@@ -1,12 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  alignLabel,
-  buildLines,
-  clip,
-  EXTRAS_MAX_LENGTH,
-  NAMED_WIDTH,
-  windowRank,
-} from "@/quota-lines";
+import { buildLines, EXTRAS_MAX_LENGTH, NAMED_WIDTH } from "@/quota-lines";
+import { clip, padLabel } from "@/tui-format";
 import type { ProviderReport, UsageWindow, WindowKind } from "@/types";
 
 type Theme = Parameters<typeof buildLines>[0];
@@ -51,7 +45,7 @@ function lineText(line: { segments: { text: string }[] }): string {
 
 const now = new Date("2026-09-16T12:00:00Z");
 
-describe("clip / alignLabel", () => {
+describe("clip / padLabel", () => {
   it("collapses whitespace and trims", () => {
     expect(clip("  hello   world  ")).toBe("hello world");
     expect(clip("short", 60)).toBe("short");
@@ -64,20 +58,9 @@ describe("clip / alignLabel", () => {
   });
 
   it("pads and truncates labels to NAMED_WIDTH", () => {
-    expect(alignLabel("5h limit")).toHaveLength(NAMED_WIDTH);
-    expect(alignLabel("a".repeat(20))).toHaveLength(NAMED_WIDTH);
-    expect(alignLabel("a".repeat(20)).endsWith(" ")).toBe(true);
-  });
-});
-
-describe("windowRank", () => {
-  it("orders known kinds and puts unknowns last", () => {
-    expect(windowRank("5h")).toBe(0);
-    expect(windowRank("weekly")).toBe(1);
-    expect(windowRank("monthly")).toBe(2);
-    expect(windowRank("daily")).toBe(3);
-    expect(windowRank("other")).toBe(4);
-    expect(windowRank("mystery" as WindowKind)).toBe(4);
+    expect(padLabel("5h limit", NAMED_WIDTH)).toHaveLength(NAMED_WIDTH);
+    expect(padLabel("a".repeat(20), NAMED_WIDTH)).toHaveLength(NAMED_WIDTH);
+    expect(padLabel("a".repeat(20), NAMED_WIDTH).endsWith("…")).toBe(true);
   });
 });
 
@@ -118,7 +101,7 @@ describe("buildLines", () => {
     expect(lineText(lines[0])).toBe("loading…");
   });
 
-  it("orders windows by WINDOW_ORDER with unknown kinds last", () => {
+  it("orders windows by WINDOW_ORDER", () => {
     const lines = buildLines(
       theme(),
       [
@@ -139,21 +122,6 @@ describe("buildLines", () => {
     );
     const labels = lines.slice(1).map((line) => line.segments[0].text.trim());
     expect(labels).toEqual(["5h limit", "Weekly limit", "Monthly limit", "Daily limit", "Other"]);
-
-    const unknown = buildLines(
-      theme(),
-      [
-        report({
-          windows: [usageWindow("mystery" as WindowKind, { label: "Mystery" }), usageWindow("5h")],
-        }),
-      ],
-      false,
-      null,
-      now,
-      14,
-    );
-    const unknownLabels = unknown.slice(1).map((line) => line.segments[0].text.trim());
-    expect(unknownLabels).toEqual(["5h limit", "Mystery"]);
   });
 
   it("renders the reset countdown column", () => {

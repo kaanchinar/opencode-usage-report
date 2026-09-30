@@ -7,7 +7,6 @@ export interface ContextRow {
   label: string;
   tokens: number | null;
   percent: number | null; // 0-100, null when the limit is unknown
-  exact: boolean;
 }
 
 export interface GridCell {

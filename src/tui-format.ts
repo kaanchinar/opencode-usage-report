@@ -13,6 +13,18 @@ export const MIN_REFRESH_INTERVAL_SECONDS = 5;
 export const MAX_REFRESH_INTERVAL_SECONDS = 3600;
 export const DEFAULT_REFRESH_INTERVAL_SECONDS = 60;
 
+/** Collapses whitespace and truncates to a single-line label. */
+export function clip(value: string, max = 60): string {
+  const single = value.replace(/\s+/g, " ").trim();
+  if (single.length <= max) return single;
+  return single.slice(0, Math.max(0, max - 1)) + "…";
+}
+
+/** Pads a label to a fixed width, truncating with an ellipsis when long. */
+export function padLabel(label: string, width: number): string {
+  return clip(label, width).padEnd(width);
+}
+
 /**
  * Renders a fixed-width progress bar. `percent` is clamped to 0-100 and rounded
  * to the nearest filled cell; `null` (or any non-finite value) renders an empty

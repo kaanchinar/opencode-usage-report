@@ -1,4 +1,5 @@
 import type { Model } from "@opencode-ai/sdk/v2";
+import { finiteOrNull } from "../normalize";
 
 export interface Headroom {
   usable: number | null;
@@ -10,10 +11,6 @@ export interface HeadroomInput {
   limit: Model["limit"] | null | undefined;
   total: number | null;
   compaction?: { reserved?: number } | null;
-}
-
-function finiteOrNull(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 /** Compaction headroom, mirroring opencode's overflow check; nulls when unusable. */
