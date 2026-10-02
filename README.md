@@ -71,6 +71,12 @@ Or add the plugin manually to each file and restart opencode:
 > `opencode plugin opencode-usage-report` prints `Detected server + tui targets`
 > when the resolution works.
 
+> **OpenCode 2.x (0.5.0).** The server entrypoint default-exports the V2
+> `{ id, setup }` definition and still carries the V1 `server` hook, so
+> OpenCode 1.18.29+ and 2.x both load it. Before 0.5.0 the module exported a
+> bare V1 function, which OpenCode 2 rejects. The TUI entrypoint is unchanged
+> in this release.
+
 Options can be passed in the tuple form, independently per entrypoint:
 
 ```jsonc
