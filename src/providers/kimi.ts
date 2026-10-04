@@ -65,12 +65,17 @@ function findLimitDetail(limits: unknown, durationMinutes: number): unknown {
   return undefined;
 }
 
-function ratioWindow(kind: UsageWindow["kind"], label: string, value: unknown): UsageWindow {
+/** 0-100 percent from a quota entry's `used_ratio`, or null when it is absent/invalid. */
+function ratioPercent(value: unknown): number | null {
   const ratio = toNumber(pick(value, "used_ratio", "usedRatio"));
+  return ratio === null ? null : ratioToPercent(ratio);
+}
+
+function ratioWindow(kind: UsageWindow["kind"], label: string, value: unknown): UsageWindow {
   return {
     kind,
     label,
-    usedPercent: ratio !== null ? ratioToPercent(ratio) : null,
+    usedPercent: ratioPercent(value),
     used: null,
     limit: null,
     remaining: null,
@@ -88,6 +93,64 @@ function detailWindow(kind: UsageWindow["kind"], label: string, detail: unknown)
   });
 }
 
+/**
+ * Booster-wallet amounts are fixed-point integers in micro-cents
+ * (1_000_000 → 1 cent), matching the official kimi-code parser.
+ */
+const FIXED_POINT_CENTS = 1_000_000;
+
+function fixedPointToCents(value: unknown): number | null {
+  const raw = toNumber(value);
+  if (raw === null) return null;
+  const cents = raw / FIXED_POINT_CENTS;
+  if (cents > 0 && cents < 1) return 1;
+  return Math.round(cents);
+}
+
+function formatMoney(cents: number, currency: string): string {
+  return `$${(cents / 100).toFixed(2)} ${currency}`;
+}
+
+/** Currency for the wallet, taken from whichever money field carries one. */
+function walletCurrency(wallet: unknown): string {
+  for (const key of ["monthlyChargeLimit", "monthlyUsed"]) {
+    const currency = pick(pick(wallet, key), "currency");
+    if (typeof currency === "string" && currency !== "") return currency;
+  }
+  return "USD";
+}
+
+/**
+ * Renders the Extra Usage ("booster") wallet into `extras`. The post-2026-09
+ * quota model sends `boosterWallet.balance` as a `BOOSTER` descriptor with
+ * fixed-point micro-cents; the pre-2026-09 wire sent a scalar `booster_wallet.balance`.
+ */
+function parseBoosterWallet(body: unknown, extras: Record<string, string>): void {
+  const wallet = pick(body, "boosterWallet", "booster_wallet");
+  if (wallet === undefined) return;
+
+  const balance = pick(wallet, "balance");
+  const totalCents =
+    pick(balance, "type") === "BOOSTER" ? fixedPointToCents(pick(balance, "amount")) : null;
+  if (totalCents !== null && totalCents > 0) {
+    const left = fixedPointToCents(pick(balance, "amountLeft")) ?? 0;
+    extras["Booster wallet"] = formatMoney(left, walletCurrency(wallet));
+  } else if (typeof balance === "string" || typeof balance === "number") {
+    extras["Booster wallet"] = String(balance);
+  }
+
+  const monthlyUsed = pick(wallet, "monthlyUsed", "monthly_used");
+  const currency = pick(monthlyUsed, "currency");
+  const priceInCents = toNumber(pick(monthlyUsed, "priceInCents", "price_in_cents"));
+  if (
+    (typeof currency === "string" || typeof currency === "number") &&
+    String(currency) !== "" &&
+    priceInCents !== null
+  ) {
+    extras["Booster used this month"] = formatMoney(priceInCents, String(currency));
+  }
+}
+
 function parse(body: Record<string, unknown>, cred: Credential): AdapterResult {
   const windows: UsageWindow[] = [];
   const extras: Record<string, string> = {};
@@ -96,9 +159,9 @@ function parse(body: Record<string, unknown>, cred: Credential): AdapterResult {
   const usage = pick(body, "usage");
   const limits = pick(body, "limits");
 
-  // Count-based windows are authoritative; the `usages.limit_5h/limit_7d`
-  // ratios are legacy fields the live API returns as stale zeros even while
-  // real usage accrues, so they are only a fallback when counts are missing.
+  // Count-based windows are authoritative when present; the `usages.limit_*`
+  // ratios are the primary wire on the post-2026-09 quota model, where the
+  // absolute `usage`/`limits[]` rows were removed.
   const detail5h = findLimitDetail(limits, 300);
   if (detail5h !== undefined) {
     windows.push(detailWindow("5h", "5-hour", detail5h));
@@ -114,43 +177,36 @@ function parse(body: Record<string, unknown>, cred: Credential): AdapterResult {
     if (limit7d !== undefined) windows.push(ratioWindow("weekly", "Weekly", limit7d));
   }
 
+  // The monthly total joined the quota model; `totalQuota` is the legacy shape.
+  // `limit_month_code` is the code-typed share the official client shows as a
+  // breakdown under the monthly row.
+  const monthTotal = pick(usages, "limit_month_total");
+  if (monthTotal !== undefined) {
+    windows.push(ratioWindow("monthly", "Monthly", monthTotal));
+    const codePercent = ratioPercent(pick(usages, "limit_month_code"));
+    if (codePercent !== null) extras["Monthly code"] = `${codePercent}%`;
+  } else {
+    const totalQuota = pick(body, "totalQuota", "total_quota");
+    const quotaUsed = toNumber(pick(totalQuota, "used"));
+    if (totalQuota !== undefined && quotaUsed !== null && quotaUsed > 0) {
+      windows.push({
+        kind: "monthly",
+        label: "Monthly",
+        usedPercent: null,
+        used: quotaUsed,
+        limit: toNumber(pick(totalQuota, "limit")),
+        remaining: toNumber(pick(totalQuota, "remaining")),
+        resetsAt: toISODate(pick(totalQuota, "resetTime", "reset_time", "resetAt", "resetsAt")),
+        status: "frozen",
+      });
+    }
+  }
+
   const level = pick(pick(body, "user"), "membership");
   const membershipLevel = pick(level, "level");
   if (membershipLevel !== undefined) extras["Plan"] = String(membershipLevel);
 
-  const wallet = pick(body, "booster_wallet");
-
-  // `balance` is a wallet descriptor object on the live API; only render scalar values.
-  const balance = pick(wallet, "balance");
-  if (typeof balance === "string" || typeof balance === "number") {
-    extras["Booster wallet"] = String(balance);
-  }
-
-  const monthlyUsed = pick(wallet, "monthlyUsed", "monthly_used");
-  const currency = pick(monthlyUsed, "currency");
-  const priceInCents = toNumber(pick(monthlyUsed, "priceInCents", "price_in_cents"));
-  if (
-    (typeof currency === "string" || typeof currency === "number") &&
-    String(currency) !== "" &&
-    priceInCents !== null
-  ) {
-    extras["Booster used this month"] = `$${(priceInCents / 100).toFixed(2)} ${String(currency)}`;
-  }
-
-  const totalQuota = pick(body, "totalQuota", "total_quota");
-  const quotaUsed = toNumber(pick(totalQuota, "used"));
-  if (totalQuota !== undefined && quotaUsed !== null && quotaUsed > 0) {
-    windows.push({
-      kind: "monthly",
-      label: "Monthly",
-      usedPercent: null,
-      used: quotaUsed,
-      limit: toNumber(pick(totalQuota, "limit")),
-      remaining: toNumber(pick(totalQuota, "remaining")),
-      resetsAt: toISODate(pick(totalQuota, "resetTime", "reset_time", "resetAt", "resetsAt")),
-      status: "frozen",
-    });
-  }
+  parseBoosterWallet(body, extras);
 
   if (windows.length === 0) {
     throw new AdapterError(

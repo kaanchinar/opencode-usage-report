@@ -176,4 +176,36 @@ describe("kimi response parsing", () => {
       "2026-10-01T00:00:00.000Z",
     );
   });
+  it("parses the post-2026-09 quota model (usages ratios + monthly total/code)", async () => {
+    mockFetch(200, {
+      goods_version: 2,
+      usages: {
+        limit_5h: { used_ratio: 0.3, reset_time: "2026-09-16T14:05:00Z" },
+        limit_7d: { used_ratio: 0.2, reset_time: "2026-09-22T00:00:00Z" },
+        limit_month_total: { used_ratio: 0.4, reset_time: "2026-10-01T00:00:00Z" },
+        limit_month_code: { used_ratio: 0.25 },
+      },
+    });
+    const r = await kimiGlobalAdapter.fetch(cred, opts);
+    expect(r.windows.find((w) => w.kind === "5h")?.usedPercent).toBe(30);
+    expect(r.windows.find((w) => w.kind === "weekly")?.usedPercent).toBe(20);
+    const monthly = r.windows.find((w) => w.kind === "monthly");
+    expect(monthly?.usedPercent).toBe(40);
+    expect(monthly?.resetsAt).toBe("2026-10-01T00:00:00.000Z");
+    expect(r.extras?.["Monthly code"]).toBe("25%");
+  });
+  it("parses the camelCase boosterWallet (fixed-point BOOSTER balance)", async () => {
+    mockFetch(200, {
+      usages: { limit_5h: { used_ratio: 0.1 } },
+      boosterWallet: {
+        balance: { type: "BOOSTER", amount: "20000000000", amountLeft: "10000000000" },
+        monthlyChargeLimitEnabled: true,
+        monthlyChargeLimit: { currency: "CNY", priceInCents: "20000" },
+        monthlyUsed: { currency: "CNY", priceInCents: "5000" },
+      },
+    });
+    const r = await kimiGlobalAdapter.fetch(cred, opts);
+    expect(r.extras?.["Booster wallet"]).toBe("$100.00 CNY");
+    expect(r.extras?.["Booster used this month"]).toBe("$50.00 CNY");
+  });
 });
