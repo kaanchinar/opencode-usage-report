@@ -34,3 +34,40 @@ jobs:
       - run: npm ci
       # prepublishOnly runs typecheck + tests before the upload.
       - run: npm stage publish --provenance --access public
+
+  # Publishes the GitHub Release for the tag. Runs alongside `publish` (not
+  # after) so a failed/slow npm stage never blocks the release page.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Prefer the hand-written README changelog entry for this version; fall
+      # back to GitHub's generated notes when the version has no entry.
+      - name: Build release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            $0 ~ "^- \\*\\*" ver "\\*\\*" { found = 1 }
+            found && $0 ~ "^- \\*\\*" && $0 !~ ver { exit }
+            found { print }
+          ' README.md > release-notes.md
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -s release-notes.md ]; then
+            notes=(--notes-file release-notes.md)
+          else
+            notes=(--generate-notes)
+          fi
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" "${notes[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" \
+              "${notes[@]}" --verify-tag
+          fi
