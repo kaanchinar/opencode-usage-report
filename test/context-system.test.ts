@@ -9,7 +9,13 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { captureIsFresh, contextCapturePath, readCapture, writeCapture } from "@/context/system";
+import {
+  captureIsFresh,
+  captureSince,
+  contextCapturePath,
+  readCapture,
+  writeCapture,
+} from "@/context/system";
 import type { SystemCapture } from "@/context/types";
 
 const env = (dir: string) => ({ OPENCODE_DATA_HOME: dir }) as unknown as NodeJS.ProcessEnv;
@@ -136,11 +142,85 @@ describe("captureIsFresh", () => {
     const cap = capture();
     const ref = { sessionID: "s1", providerID: "p1", modelID: "m1", since: 1 };
     expect(captureIsFresh(cap, ref)).toBe(true);
+    expect(captureIsFresh(cap, { ...ref, since: 0 })).toBe(false);
     expect(captureIsFresh(cap, { ...ref, since: 2 })).toBe(false);
     expect(captureIsFresh(cap, { ...ref, sessionID: "x" })).toBe(false);
     expect(captureIsFresh(cap, { ...ref, providerID: "x" })).toBe(false);
     expect(captureIsFresh(cap, { ...ref, modelID: "x" })).toBe(false);
     expect(captureIsFresh(null, ref)).toBe(false);
     expect(captureIsFresh(capture({ capturedAt: Number.NaN }), ref)).toBe(false);
+  });
+});
+
+describe("captureSince", () => {
+  const user = (created: number) => ({ role: "user", time: { created } });
+  const assistant = (created: number) => ({ role: "assistant", time: { created } });
+
+  it("returns the creation time of the user message that started the turn", () => {
+    const reference = assistant(30);
+    const messages = [user(5), assistant(10), user(20), reference];
+    expect(captureSince(messages, reference)).toBe(20);
+  });
+
+  it("accepts a capture taken after the user message but before the assistant's own timestamp", () => {
+    // OpenCode 2 writes the capture during request assembly, a few milliseconds
+    // before the assistant row is stamped; the boundary must still hold.
+    const reference = assistant(1002);
+    const cap = capture({ capturedAt: 1000 });
+    expect(
+      captureIsFresh(cap, {
+        sessionID: "s1",
+        providerID: "p1",
+        modelID: "m1",
+        since: captureSince([user(999), reference], reference),
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects a capture left over from a previous turn", () => {
+    const reference = assistant(1002);
+    const cap = capture({ capturedAt: 600 });
+    expect(
+      captureIsFresh(cap, {
+        sessionID: "s1",
+        providerID: "p1",
+        modelID: "m1",
+        since: captureSince([user(400), assistant(500), user(999), reference], reference),
+      }),
+    ).toBe(false);
+  });
+
+  it("falls back to the reference timestamp when no user message precedes it", () => {
+    const reference = assistant(42);
+    expect(captureSince([reference], reference)).toBe(42);
+    expect(captureSince([], reference)).toBe(42);
+  });
+
+  it("skips user messages with unusable timestamps and never throws on junk input", () => {
+    const reference = assistant(30);
+    const messages = [
+      { role: "user", time: {} },
+      { role: "user", time: { created: 0 } },
+      { role: "user" },
+      user(20),
+      reference,
+    ];
+    expect(captureSince(messages, reference)).toBe(20);
+    expect(captureSince(null as unknown as readonly unknown[], reference)).toBe(30);
+    expect(captureSince([null, 5, "user"], null)).toBe(0);
+  });
+
+  it("returns 0 (and captures are rejected) when no timestamp is usable", () => {
+    const reference = assistant(0);
+    const since = captureSince([{ role: "user", time: { created: 0 } }, reference], reference);
+    expect(since).toBe(0);
+    expect(
+      captureIsFresh(capture({ capturedAt: 10 }), {
+        sessionID: "s1",
+        providerID: "p1",
+        modelID: "m1",
+        since,
+      }),
+    ).toBe(false);
   });
 });

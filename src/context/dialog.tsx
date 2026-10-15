@@ -4,7 +4,7 @@ import type { AssistantMessage, Model } from "@opencode-ai/sdk/v2";
 import { For, Show, createMemo } from "solid-js";
 import { buildContextLines, type ContextTone } from "./format";
 import { collectContext } from "./collect";
-import { captureIsFresh } from "./system";
+import { captureIsFresh, captureSince } from "./system";
 import type { ContextBreakdown, SystemCapture } from "./types";
 import { buildLines } from "../quota-lines";
 import type { ProviderReport } from "../types";
@@ -98,7 +98,7 @@ export function UsageDialog(props: UsageDialogProps) {
       sessionID: last.sessionID,
       providerID: last.providerID,
       modelID: last.modelID,
-      since: last.time?.created ?? 0,
+      since: captureSince(messages(), last),
     });
     return ok ? capture : null;
   });

@@ -62,6 +62,8 @@ export interface V2Route {
 
 export interface V2ModelRef {
   readonly providerID?: string;
+  /** The OpenCode 2 store spells the model id `id`; older mirrors used `modelID`. */
+  readonly id?: string;
   readonly modelID?: string;
 }
 
@@ -249,7 +251,10 @@ function createdAt(message: { readonly time?: { readonly created?: number } }): 
  * messages carry a single `text` and an optional file list, so those are
  * synthesized into the same part shape.
  */
-function translateMessage(raw: unknown): {
+function translateMessage(
+  raw: unknown,
+  sessionID: string,
+): {
   record: Record<string, unknown>;
   parts: Array<Record<string, unknown>>;
 } {
@@ -264,9 +269,12 @@ function translateMessage(raw: unknown): {
     return {
       record: {
         id,
+        sessionID,
         role: "assistant",
         providerID: safeString(model.providerID),
-        modelID: safeString(model.modelID),
+        // The store sends `model.id` (e.g. `{ id: "k3", providerID, variant }`);
+        // `model.modelID` is kept as a fallback for older hosts and fixtures.
+        modelID: safeString(model.modelID) || safeString(model.id),
         time: createdAt(message),
         tokens: {
           input: finiteOrNull(tokens.input) ?? 0,
@@ -294,7 +302,7 @@ function translateMessage(raw: unknown): {
       }
     }
     return {
-      record: { id, role: "user", time: createdAt(message), tokens: { ...ZERO_TOKENS } },
+      record: { id, sessionID, role: "user", time: createdAt(message), tokens: { ...ZERO_TOKENS } },
       parts,
     };
   }
@@ -362,7 +370,7 @@ export function createV2Api(ctx: V2Context): TuiPluginApi {
           const messages: Array<Record<string, unknown>> = [];
           partsById.clear();
           for (const raw of list) {
-            const { record, parts } = translateMessage(raw);
+            const { record, parts } = translateMessage(raw, sessionID);
             if (typeof record.id !== "string" || record.id === "") continue;
             messages.push(record);
             partsById.set(record.id, parts);

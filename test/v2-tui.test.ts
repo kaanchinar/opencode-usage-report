@@ -142,7 +142,7 @@ describe("createV2Api", () => {
         {
           id: "a1",
           type: "assistant",
-          model: { providerID: "kimi", modelID: "k2" },
+          model: { id: "k2", providerID: "kimi" },
           content: [
             { type: "text", text: "hi" },
             { type: "reasoning", text: "hmm" },
@@ -158,10 +158,11 @@ describe("createV2Api", () => {
       Record<string, unknown>
     >;
     expect(messages).toHaveLength(2);
-    expect(messages[0]).toMatchObject({ id: "u1", role: "user" });
+    expect(messages[0]).toMatchObject({ id: "u1", role: "user", sessionID: "ses_1" });
     expect(messages[1]).toMatchObject({
       id: "a1",
       role: "assistant",
+      sessionID: "ses_1",
       providerID: "kimi",
       modelID: "k2",
     });
@@ -171,13 +172,39 @@ describe("createV2Api", () => {
     expect((api.state.session.get("ses_1") as unknown as { cost: number }).cost).toBe(0);
   });
 
+  it("reads the model id from `model.modelID` when the host still sends the old spelling", () => {
+    const data = makeData({
+      messages: [
+        {
+          id: "a1",
+          type: "assistant",
+          model: { providerID: "kimi", modelID: "k2-legacy" },
+          tokens: { output: 1 },
+        },
+      ],
+    });
+    const api = createV2Api(makeCtx(data));
+    const messages = api.state.session.messages("ses_1") as unknown as Array<
+      Record<string, unknown>
+    >;
+    expect(messages[0]).toMatchObject({ providerID: "kimi", modelID: "k2-legacy" });
+  });
+
   it("never throws when an assistant message has no tokens (UsageDialog reads .tokens.output)", () => {
     const data = makeData({ messages: [{ id: "a1", type: "assistant" }] });
     const api = createV2Api(makeCtx(data));
     const messages = api.state.session.messages("ses_1") as unknown as Array<{
       tokens: { output: number };
+      providerID: string;
+      modelID: string;
+      sessionID: string;
     }>;
     expect(messages[0].tokens.output).toBe(0);
+    // Degrades to empty model refs, which the capture check rejects, rather
+    // than crashing or matching the wrong model.
+    expect(messages[0].providerID).toBe("");
+    expect(messages[0].modelID).toBe("");
+    expect(messages[0].sessionID).toBe("ses_1");
   });
 
   it("forwards the V1 dialog calls to the V2 stack", () => {

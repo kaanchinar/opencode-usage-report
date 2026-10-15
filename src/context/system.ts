@@ -110,6 +110,42 @@ export function captureIsFresh(
   if (capture.modelID !== ref.modelID) return false;
   const capturedAt = nonNegative(capture.capturedAt);
   const since = nonNegative(ref.since);
-  if (capturedAt === null || since === null) return false;
+  // A zero boundary means the caller had no usable timestamp — treat it as
+  // unusable rather than "anything is fresh" (epoch 0 is never a real turn).
+  if (capturedAt === null || since === null || since === 0) return false;
   return capturedAt >= since;
+}
+
+function messageCreated(value: unknown): number | null {
+  if (!isRecord(value)) return null;
+  const time = isRecord(value.time) ? value.time : {};
+  const created = nonNegative(time.created);
+  return created !== null && created > 0 ? created : null;
+}
+
+/**
+ * The `since` boundary for `captureIsFresh`: the creation time of the user
+ * message that started the turn `reference` belongs to, falling back to the
+ * reference's own creation time. Returns `0` when neither carries a usable
+ * timestamp, which `captureIsFresh` rejects.
+ *
+ * OpenCode 2 assembles the request — firing the system-transform hook — just
+ * before the assistant message row gets its `time.created`, so a capture from
+ * the current turn is a few milliseconds *older* than the message and the old
+ * `capturedAt >= message.created` boundary rejected every fresh capture. The
+ * turn's user message predates request assembly under both OpenCode 1 and 2,
+ * so it is an ordering-stable boundary; a capture written for an earlier turn
+ * still sits before it and is still rejected.
+ */
+export function captureSince(messages: readonly unknown[], reference: unknown): number {
+  const list = Array.isArray(messages) ? messages : [];
+  const index = list.indexOf(reference);
+  const start = index === -1 ? list.length : index;
+  for (let i = start - 1; i >= 0; i--) {
+    const message = list[i];
+    if (!isRecord(message) || message.role !== "user") continue;
+    const created = messageCreated(message);
+    if (created !== null) return created;
+  }
+  return messageCreated(reference) ?? 0;
 }
