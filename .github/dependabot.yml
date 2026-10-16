@@ -6,7 +6,10 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     ignore:
-      # @opentui/solid@0.5.11 pins solid-js to exactly 1.9.12; revisit when it widens the peer range
+      # @opentui/solid@0.5.11 pins solid-js to exactly 1.9.12; revisit when it
+      # widens the peer range. While pinned, seroval stays on package.json
+      # "overrides" because solid-js declares ~1.5.0, whose whole range is
+      # covered by the critical seroval advisories.
       - dependency-name: "solid-js"
   - package-ecosystem: "github-actions"
     directory: "/"
