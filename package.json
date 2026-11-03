@@ -1,7 +1,7 @@
 {
   "name": "opencode-usage-report",
-  "version": "0.6.3",
-  "description": "opencode plugin: /usage command showing subscription quota windows for configured providers",
+  "version": "0.6.4",
+  "description": "opencode plugin: /usage dialog, sidebar panel and usage_report tool for subscription quota and context usage",
   "keywords": [
     "kimi",
     "opencode",

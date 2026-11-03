@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
 import type { AssistantMessage, Model } from "@opencode-ai/sdk/v2";
-import { For, Show, createMemo } from "solid-js";
+import { For, Show, createMemo, onCleanup } from "solid-js";
 import { buildContextLines, type ContextTone } from "./format";
 import { collectContext } from "./collect";
 import { captureIsFresh, captureSince } from "./system";
@@ -24,6 +24,10 @@ export interface UsageDialogProps {
   system: () => SystemCapture | null;
   scope: () => number;
   showJson: () => boolean;
+  /** Fires on any panel change the dialog must re-read. */
+  subscribe: (listener: () => void) => () => void;
+  /** Re-renders the whole dialog; OpenCode loads this module on a separate Solid runtime. */
+  rerender: () => void;
   barWidth: number;
 }
 
@@ -72,6 +76,11 @@ function jsonLines(value: unknown): RenderedLine[] {
 /** The `/usage` dialog: context usage on top, the existing quota output below. */
 export function UsageDialog(props: UsageDialogProps) {
   const theme = () => props.api.theme.current;
+
+  // OpenCode loads this module against a different Solid runtime than the
+  // plugin entry, so signals never track across the two. Ask the host to
+  // re-render the dialog instead.
+  onCleanup(props.subscribe(props.rerender));
 
   const messages = createMemo(() =>
     props.sessionID === null ? [] : props.api.state.session.messages(props.sessionID),

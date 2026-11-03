@@ -30,9 +30,32 @@ function createUsagePanel(getSessionID: () => string | null, options: ResolvedTu
   const [error, setError] = createSignal<string | null>(null);
   const [tick, setTick] = createSignal(Date.now());
   const [capture, setCapture] = createSignal<SystemCapture | null>(null);
-  const [scope, setScope] = createSignal(0);
-  const [showJson, setShowJson] = createSignal(false);
+  const [scope, setScopeSignal] = createSignal(0);
+  const [showJson, setShowJsonSignal] = createSignal(false);
   let disposed = false;
+
+  // The dialog lives in another module, which OpenCode can load against a
+  // second Solid runtime; its memos then never track these signals. Plain
+  // subscribers let it bump a signal it owns instead.
+  const listeners = new Set<() => void>();
+  const notify = (): void => {
+    // Snapshot: a listener may re-render the dialog, which resubscribes.
+    for (const listener of Array.from(listeners)) listener();
+  };
+  const subscribe = (listener: () => void): (() => void) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+  const setScope = (value: number | ((n: number) => number)): void => {
+    setScopeSignal(value);
+    notify();
+  };
+  const setShowJson = (value: boolean | ((v: boolean) => boolean)): void => {
+    setShowJsonSignal(value);
+    notify();
+  };
 
   const load = async (refresh = false): Promise<void> => {
     if (disposed) return;
@@ -55,6 +78,7 @@ function createUsagePanel(getSessionID: () => string | null, options: ResolvedTu
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setInFlight((n) => Math.max(0, n - 1));
+      notify();
     }
   };
 
@@ -63,13 +87,16 @@ function createUsagePanel(getSessionID: () => string | null, options: ResolvedTu
     const sessionID = getSessionID();
     if (sessionID === null) {
       setCapture(null);
+      notify();
       return;
     }
     setCapture(await readCapture(sessionID));
+    notify();
   };
 
   const refresh = (): void => {
     setTick(Date.now());
+    notify();
     void load();
     void refreshCapture();
   };
@@ -88,6 +115,7 @@ function createUsagePanel(getSessionID: () => string | null, options: ResolvedTu
     showJson,
     setScope,
     setShowJson,
+    subscribe,
     load,
     refreshCapture,
     refresh,
@@ -96,6 +124,7 @@ function createUsagePanel(getSessionID: () => string | null, options: ResolvedTu
     dispose: (): void => {
       disposed = true;
       clearInterval(timer);
+      listeners.clear();
     },
   };
 }
@@ -153,28 +182,37 @@ export const tui: TuiPlugin = async (api, rawOptions) => {
   api.lifecycle.onDispose(panel.dispose);
   api.lifecycle.onDispose(api.event.on("session.idle", panel.refresh));
 
+  // V1's replace re-invokes this, so the dialog reads the current panel state.
+  const showDialog = (sessionID: string | null): void => {
+    api.ui.dialog.replace(() => (
+      <UsageDialog
+        api={api}
+        sessionID={sessionID}
+        reports={panel.reports}
+        busy={panel.busy}
+        error={panel.error}
+        now={() => new Date(panel.tick())}
+        system={panel.capture}
+        scope={panel.scope}
+        showJson={panel.showJson}
+        subscribe={panel.subscribe}
+        rerender={() => {
+          if (!panel.isDisposed()) showDialog(sessionID);
+        }}
+        barWidth={options.barWidth}
+      />
+    ));
+    // Must follow replace(): the stack resets the size to "medium".
+    api.ui.dialog.setSize("xlarge");
+  };
+
   const openDialog = (): void => {
     const sessionID = activeSessionID(api);
     void panel.refreshCapture().finally(() => {
       if (panel.isDisposed()) return;
       panel.setScope(0);
       panel.setShowJson(false);
-      api.ui.dialog.replace(() => (
-        <UsageDialog
-          api={api}
-          sessionID={sessionID}
-          reports={panel.reports}
-          busy={panel.busy}
-          error={panel.error}
-          now={() => new Date(panel.tick())}
-          system={panel.capture}
-          scope={panel.scope}
-          showJson={panel.showJson}
-          barWidth={options.barWidth}
-        />
-      ));
-      // Must follow replace(): the stack resets the size to "medium".
-      api.ui.dialog.setSize("xlarge");
+      showDialog(sessionID);
     });
   };
 
@@ -316,27 +354,35 @@ function setup(ctx: V2Context): () => void {
 
   const offIdle = ctx.data.on("session.idle", () => panel.refresh());
 
+  const showDialog = (sessionID: string | null): void => {
+    ctx.ui.dialog.show(() => (
+      <UsageDialog
+        api={api}
+        sessionID={sessionID}
+        reports={panel.reports}
+        busy={panel.busy}
+        error={panel.error}
+        now={() => new Date(panel.tick())}
+        system={panel.capture}
+        scope={panel.scope}
+        showJson={panel.showJson}
+        subscribe={panel.subscribe}
+        rerender={() => {
+          if (!panel.isDisposed()) showDialog(sessionID);
+        }}
+        barWidth={options.barWidth}
+      />
+    ));
+    ctx.ui.dialog.set({ size: "xlarge" });
+  };
+
   const openDialog = (): void => {
     const sessionID = activeSessionID(api);
     void panel.refreshCapture().finally(() => {
       if (panel.isDisposed()) return;
       panel.setScope(0);
       panel.setShowJson(false);
-      ctx.ui.dialog.show(() => (
-        <UsageDialog
-          api={api}
-          sessionID={sessionID}
-          reports={panel.reports}
-          busy={panel.busy}
-          error={panel.error}
-          now={() => new Date(panel.tick())}
-          system={panel.capture}
-          scope={panel.scope}
-          showJson={panel.showJson}
-          barWidth={options.barWidth}
-        />
-      ));
-      ctx.ui.dialog.set({ size: "xlarge" });
+      showDialog(sessionID);
     });
   };
 

@@ -46,16 +46,16 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      # Prefer the hand-written README changelog entry for this version; fall
-      # back to GitHub's generated notes when the version has no entry.
+      # Prefer the hand-written CHANGELOG entry for this version; fall back to
+      # GitHub's generated notes when the version has no entry.
       - name: Build release notes
         run: |
           version="${GITHUB_REF_NAME#v}"
           awk -v ver="$version" '
-            $0 ~ "^- \\*\\*" ver "\\*\\*" { found = 1 }
-            found && $0 ~ "^- \\*\\*" && $0 !~ ver { exit }
+            $0 == "## " ver { found = 1; next }
+            found && /^## / { exit }
             found { print }
-          ' README.md > release-notes.md
+          ' CHANGELOG.md > release-notes.md
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
