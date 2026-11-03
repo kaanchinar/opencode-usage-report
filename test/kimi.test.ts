@@ -97,6 +97,41 @@ describe("kimi response parsing", () => {
     const r = await kimiGlobalAdapter.fetch(cred, opts);
     expect(r.windows.find((w) => w.kind === "monthly")?.status).toBe("frozen");
   });
+  it("falls back to the 5h ratio when the limits[] detail carries no counts (CN)", async () => {
+    mockFetch(200, {
+      limits: [
+        {
+          window: { duration: 300, timeUnit: "TIME_UNIT_MINUTE" },
+          detail: { resetTime: "2026-11-03T13:00:00Z" },
+        },
+      ],
+      usages: { limit_5h: { used_ratio: 0.35, reset_time: "2026-11-03T13:00:00Z" } },
+    });
+    const r = await kimiCnAdapter.fetch(cred, opts);
+    const fiveH = r.windows.find((w) => w.kind === "5h")!;
+    expect(fiveH.usedPercent).toBe(35);
+    expect(fiveH.resetsAt).toBe("2026-11-03T13:00:00.000Z");
+  });
+  it("reads the monthly window from a counted 30-day limits[] entry", async () => {
+    mockFetch(200, {
+      limits: [
+        {
+          window: { duration: 43200, timeUnit: "TIME_UNIT_MINUTE" },
+          detail: {
+            limit: "100",
+            used: "20",
+            remaining: "80",
+            resetTime: "2026-12-01T00:00:00Z",
+          },
+        },
+      ],
+      usages: { limit_7d: { used_ratio: 0.1 } },
+    });
+    const r = await kimiCnAdapter.fetch(cred, opts);
+    const monthly = r.windows.find((w) => w.kind === "monthly")!;
+    expect(monthly.usedPercent).toBe(20);
+    expect(monthly.limit).toBe(100);
+  });
   it("sends Authorization and User-Agent headers", async () => {
     mockFetch(200, fixture("kimi-minimal.json"));
     await kimiGlobalAdapter.fetch(cred, opts);

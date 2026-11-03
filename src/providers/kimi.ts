@@ -161,13 +161,18 @@ function parse(body: Record<string, unknown>, cred: Credential): AdapterResult {
 
   // Count-based windows are authoritative when present; the `usages.limit_*`
   // ratios are the primary wire on the post-2026-09 quota model, where the
-  // absolute `usage`/`limits[]` rows were removed.
+  // absolute `usage`/`limits[]` rows were removed. Some regional responses
+  // send a limits[] 5h row with no counts, so fall back to its ratio instead
+  // of rendering an empty bar.
   const detail5h = findLimitDetail(limits, 300);
-  if (detail5h !== undefined) {
-    windows.push(detailWindow("5h", "5-hour", detail5h));
-  } else {
-    const limit5h = pick(usages, "limit_5h");
-    if (limit5h !== undefined) windows.push(ratioWindow("5h", "5-hour", limit5h));
+  const limit5h = pick(usages, "limit_5h");
+  const fiveHour = detail5h === undefined ? undefined : detailWindow("5h", "5-hour", detail5h);
+  if (fiveHour !== undefined && fiveHour.usedPercent !== null) {
+    windows.push(fiveHour);
+  } else if (limit5h !== undefined) {
+    windows.push(ratioWindow("5h", "5-hour", limit5h));
+  } else if (fiveHour !== undefined) {
+    windows.push(fiveHour);
   }
 
   if (usage !== undefined) {
@@ -179,12 +184,16 @@ function parse(body: Record<string, unknown>, cred: Credential): AdapterResult {
 
   // The monthly total joined the quota model; `totalQuota` is the legacy shape.
   // `limit_month_code` is the code-typed share the official client shows as a
-  // breakdown under the monthly row.
+  // breakdown under the monthly row. Some regional responses carry the monthly
+  // window as a counted 30-day entry in `limits[]` instead.
   const monthTotal = pick(usages, "limit_month_total");
+  const detailMonth = findLimitDetail(limits, 43200);
   if (monthTotal !== undefined) {
     windows.push(ratioWindow("monthly", "Monthly", monthTotal));
     const codePercent = ratioPercent(pick(usages, "limit_month_code"));
     if (codePercent !== null) extras["Monthly code"] = `${codePercent}%`;
+  } else if (detailMonth !== undefined) {
+    windows.push(detailWindow("monthly", "Monthly", detailMonth));
   } else {
     const totalQuota = pick(body, "totalQuota", "total_quota");
     const quotaUsed = toNumber(pick(totalQuota, "used"));

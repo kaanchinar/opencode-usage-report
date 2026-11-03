@@ -302,6 +302,11 @@ so a failing check blocks the stage.
 
 ## Changelog
 
+- **0.6.3** — Kimi Code CN (`kimi-code-plan-cn`): the 5-hour window falls back
+  to the `usages.limit_5h` ratio when the `limits[]` row carries no counts,
+  instead of rendering an empty `—` bar; a monthly window is also read from a
+  counted 30-day `limits[]` entry when the endpoint reports it there. Includes
+  the outstanding Dependabot dev-dependency bumps.
 - **0.6.2** — OpenCode 2 context panel fixes: the V2 adapter now reads the
   model id from the store's `model.id`, so the model lookup succeeds and the
   cell grid, per-category percentages and compaction-headroom line render
